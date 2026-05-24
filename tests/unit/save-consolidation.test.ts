@@ -39,6 +39,14 @@ const SRC = readFileSync(
   'utf8',
 );
 
+// #1023 PR1 — the no-runners empty state was extracted to its own
+// component. The affordance contract (≤1 button, "Set up AI" as link)
+// is still pinned, just sourced from the new file.
+const NO_RUNNERS_SRC = readFileSync(
+  join(process.cwd(), 'src/components/observe/NoRunnersBlock.astro'),
+  'utf8',
+);
+
 // Strip Astro comments and HTML comments so they don't generate false
 // positives when an id is mentioned inside a "removed by PR #N" note.
 function stripBlock(s: string, open: string, close: string): string {
@@ -128,8 +136,8 @@ describe('save consolidation — at most 1 primary + 1 secondary per surface', (
     // and the "Save without ID" continuation button (<button>). Any third
     // affordance must not be a button — links are fine because they don't
     // share the primary-action affordance.
-    const block = SRC.match(
-      /<div\s+id=["']obs2-no-runners["'][\s\S]*?<\/div>\s*<\/div>/,
+    const block = NO_RUNNERS_SRC.match(
+      /<div\s+id=["']obs2-no-runners["'][\s\S]*<\/div>\s*<\/div>/,
     );
     expect(
       block,
@@ -144,8 +152,8 @@ describe('save consolidation — at most 1 primary + 1 secondary per surface', (
     // anchor pointing to /profile/edit, while the "ship anyway" path is the
     // single secondary button. If both became buttons we'd lose the
     // affordance distinction and break the Fogg ability hierarchy.
-    const block = SRC.match(
-      /<div\s+id=["']obs2-no-runners["'][\s\S]*?<\/div>\s*<\/div>/,
+    const block = NO_RUNNERS_SRC.match(
+      /<div\s+id=["']obs2-no-runners["'][\s\S]*<\/div>\s*<\/div>/,
     );
     expect(block).not.toBeNull();
     expect(block![0]).toMatch(/<a\s[^>]*href=[^>]*profile\/edit/);

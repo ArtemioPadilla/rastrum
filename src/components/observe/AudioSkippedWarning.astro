@@ -1,0 +1,32 @@
+---
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
+<div id="obs2-audio-skip-warn" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+  <div class="flex items-start gap-3">
+    <span class="text-2xl shrink-0">🎵</span>
+    <div class="space-y-1">
+      <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+        {isEs ? "Audio sin identificar — BirdNET no descargado" : "Audio not identified — BirdNET not downloaded"}
+      </p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400">
+        {isEs
+          ? "Tu grabación de audio no pudo ser identificada porque BirdNET no está instalado. Descárgalo gratis (~50 MB) para identificar cantos de ave en tu dispositivo."
+          : "Your audio recording couldn't be identified because BirdNET isn't installed. Download it free (~50 MB) to identify bird calls on your device."}
+      </p>
+    </div>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
+      class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
+      {isEs ? "Descargar BirdNET" : "Download BirdNET"}
+    </a>
+    <button type="button" id="obs2-audio-skip-continue"
+      class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+      {isEs ? "Guardar sin identificar" : "Save without identification"}
+    </button>
+  </div>
+</div>

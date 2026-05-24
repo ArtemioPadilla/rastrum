@@ -7,6 +7,11 @@ import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
 import ContextualSpeciesChips from "./ContextualSpeciesChips.astro";
 import WhyThisSpecies from "./WhyThisSpecies.astro";
+import IdentifyOnlyResult from "./observe/IdentifyOnlyResult.astro";
+import NoRunnersBlock from "./observe/NoRunnersBlock.astro";
+import AudioSkippedWarning from "./observe/AudioSkippedWarning.astro";
+import CapabilityCaption from "./observe/CapabilityCaption.astro";
+import AiModeSelector from "./observe/AiModeSelector.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -75,34 +80,12 @@ const weathers = WEATHERS;
     </button>
   </div>
 
-  <!-- AI capability caption — single positive line, replaces the prior
-       multi-line banner with 4❌ (#942 PR5 redo). JS rewrites the inner
-       text once detectRunners() resolves. Hidden until then to avoid
-       layout shift. -->
-  <p id="obs2-capability-caption" class="hidden text-xs text-zinc-500 dark:text-zinc-400 text-center">
-    <span id="obs2-capability-text">{isEs ? "Verificando modelos…" : "Checking models…"}</span>
-    <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
-      class="hidden ml-1 text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
-      {isEs ? "configurar →" : "set up →"}
-    </a>
-  </p>
+  <CapabilityCaption lang={lang} />
 
   <!-- Contextual hint (shown briefly after file drop) -->
   <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
 
-  <!-- AI mode selector (#296) — hidden by default; revealed only when
-       ≥2 modes are usable (#942 PR5 redo). A selector with one usable
-       option + disabled siblings reads as broken UI. -->
-  <div id="obs2-ai-mode-selector" class="hidden">
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
-      <div class="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs" role="group" aria-label={isEs ? "Fuente de IA" : "AI source"}>
-        <button type="button" id="obs2-mode-sponsored" data-mode="sponsored" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors">{isEs ? "Patrocinado" : "Sponsored"}</button>
-        <button type="button" id="obs2-mode-own-key" data-mode="own-key" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">{isEs ? "Llave propia" : "Own key"}</button>
-        <button type="button" id="obs2-mode-local" data-mode="local" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">{isEs ? "Solo local" : "Local only"}</button>
-      </div>
-    </div>
-  </div>
+  <AiModeSelector lang={lang} />
 
   <!-- Pipeline section (hidden until files added) -->
   <div id="obs2-pipeline-section" class="hidden space-y-3">
@@ -126,32 +109,7 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
-  <div id="obs2-audio-skip-warn" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
-    <div class="flex items-start gap-3">
-      <span class="text-2xl shrink-0">🎵</span>
-      <div class="space-y-1">
-        <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm">
-          {isEs ? "Audio sin identificar — BirdNET no descargado" : "Audio not identified — BirdNET not downloaded"}
-        </p>
-        <p class="text-xs text-zinc-600 dark:text-zinc-400">
-          {isEs
-            ? "Tu grabación de audio no pudo ser identificada porque BirdNET no está instalado. Descárgalo gratis (~50 MB) para identificar cantos de ave en tu dispositivo."
-            : "Your audio recording couldn't be identified because BirdNET isn't installed. Download it free (~50 MB) to identify bird calls on your device."}
-        </p>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-2">
-      <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
-        class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
-        {isEs ? "Descargar BirdNET" : "Download BirdNET"}
-      </a>
-      <button type="button" id="obs2-audio-skip-continue"
-        class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
-        {isEs ? "Guardar sin identificar" : "Save without identification"}
-      </button>
-    </div>
-  </div>
+  <AudioSkippedWarning lang={lang} />
 
   <!-- Post-process form (hidden until pipeline done) -->
   <form id="obs2-post-form" class="hidden space-y-5" novalidate>
@@ -322,53 +280,9 @@ const weathers = WEATHERS;
          The identify-only mode is accessible via /observe?mode=identify. -->
   </form>
 
-  <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
-  <div id="obs2-identify-result" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-5 space-y-3">
-    <p class="font-semibold text-emerald-800 dark:text-emerald-300 text-center">
-      {isEs ? "Identificación completa" : "Identification complete"}
-    </p>
-    <div id="obs2-identify-species-card" class="space-y-1 text-center"></div>
-    <div class="border-t border-emerald-200 dark:border-emerald-800 pt-3 space-y-2">
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">
-        {isEs
-          ? "¿Quieres que esta observación ayude a la ciencia?"
-          : "Want this sighting to help science?"}
-      </p>
-      <button type="button" id="obs2-contribute-btn"
-        class="w-full min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition-colors">
-        {isEs ? "Sí, guardar en Rastrum" : "Yes, save to Rastrum"}
-      </button>
-      <button type="button" id="obs2-identify-done-btn"
-        class="w-full text-xs text-zinc-400 hover:text-zinc-600 underline py-1">
-        {isEs ? "No gracias" : "No thanks"}
-      </button>
-    </div>
-  </div>
+  <IdentifyOnlyResult lang={lang} />
 
-  <!-- No-runners empty state (#274) -->
-  <div id="obs2-no-runners" class="hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 space-y-3">
-    <p class="font-semibold text-amber-800 dark:text-amber-300">
-      {isEs ? "🔧 Sin modelos de IA configurados" : "🔧 No AI models configured"}
-    </p>
-    <div class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
-      <p>{isEs ? "Para identificar especies automáticamente:" : "To identify species automatically:"}</p>
-      <ul class="list-disc list-inside space-y-0.5 ml-1">
-        <li>{isEs ? "Descarga BirdNET para cantos de ave (gratis, ~50 MB)" : "Download BirdNET for bird calls (free, ~50 MB)"}</li>
-        <li>{isEs ? "Agrega una llave de PlantNet para plantas (gratis, 500/día)" : "Add a PlantNet API key for plants (free, 500/day)"}</li>
-        <li>{isEs ? "Agrega una llave de Claude para identificación general" : "Add a Claude key for general identification"}</li>
-      </ul>
-    </div>
-    <div class="flex gap-3 flex-wrap">
-      <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
-        class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
-        {isEs ? "Configurar IA →" : "Set up AI →"}
-      </a>
-      <button type="button" id="obs2-no-runners-continue"
-        class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
-        {isEs ? "Guardar sin identificar →" : "Save without ID →"}
-      </button>
-    </div>
-  </div>
+  <NoRunnersBlock lang={lang} />
 
   <!-- Identification failed — show the actual reason (#identify-reliability) -->
   <div id="obs2-identify-error" class="hidden rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">

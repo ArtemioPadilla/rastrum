@@ -1,0 +1,30 @@
+---
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- No-runners empty state (#274) -->
+<div id="obs2-no-runners" class="hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 space-y-3">
+  <p class="font-semibold text-amber-800 dark:text-amber-300">
+    {isEs ? "🔧 Sin modelos de IA configurados" : "🔧 No AI models configured"}
+  </p>
+  <div class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
+    <p>{isEs ? "Para identificar especies automáticamente:" : "To identify species automatically:"}</p>
+    <ul class="list-disc list-inside space-y-0.5 ml-1">
+      <li>{isEs ? "Descarga BirdNET para cantos de ave (gratis, ~50 MB)" : "Download BirdNET for bird calls (free, ~50 MB)"}</li>
+      <li>{isEs ? "Agrega una llave de PlantNet para plantas (gratis, 500/día)" : "Add a PlantNet API key for plants (free, 500/day)"}</li>
+      <li>{isEs ? "Agrega una llave de Claude para identificación general" : "Add a Claude key for general identification"}</li>
+    </ul>
+  </div>
+  <div class="flex gap-3 flex-wrap">
+    <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
+      class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
+      {isEs ? "Configurar IA →" : "Set up AI →"}
+    </a>
+    <button type="button" id="obs2-no-runners-continue"
+      class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+      {isEs ? "Guardar sin identificar →" : "Save without ID →"}
+    </button>
+  </div>
+</div>
