@@ -446,45 +446,72 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     } catch { /* env not configured / column missing — fail closed */ }
   }
 
+  function setPresetButtonActive(btn: HTMLButtonElement, active: boolean): void {
+    btn.classList.toggle('border-emerald-600', active);
+    btn.classList.toggle('bg-emerald-50', active);
+    btn.classList.toggle('dark:bg-emerald-900/30', active);
+    btn.classList.toggle('text-emerald-900', active);
+    btn.classList.toggle('dark:text-emerald-100', active);
+    btn.classList.toggle('ring-2', active);
+    btn.classList.toggle('ring-emerald-500', active);
+    btn.classList.toggle('border-zinc-300', !active);
+    btn.classList.toggle('dark:border-zinc-700', !active);
+    btn.classList.toggle('text-zinc-700', !active);
+    btn.classList.toggle('dark:text-zinc-300', !active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+
   function renderPresetButtons(container: HTMLElement): void {
     container.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'mt-3 flex flex-col gap-1.5';
+    // Hydrate any prior choice from localStorage (replay-tour case) so the
+    // researcher default doesn't silently overwrite a user's earlier pick.
+    try {
+      const stored = localStorage.getItem(PRIVACY_PRESET_KEY);
+      if (stored === 'open_scientist' || stored === 'researcher' || stored === 'private_observer') {
+        chosenPreset = stored;
+      }
+    } catch { /* noop */ }
     for (const key of PRESET_KEYS) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.preset = key;
-      btn.className = 'text-left text-xs px-3 py-2 rounded-md border transition-colors';
-      btn.textContent = PRESET_LABELS[key];
-      const setActive = (active: boolean) => {
-        btn.classList.toggle('border-emerald-600', active);
-        btn.classList.toggle('bg-emerald-50', active);
-        btn.classList.toggle('dark:bg-emerald-900/30', active);
-        btn.classList.toggle('text-emerald-900', active);
-        btn.classList.toggle('dark:text-emerald-100', active);
-        btn.classList.toggle('border-zinc-300', !active);
-        btn.classList.toggle('dark:border-zinc-700', !active);
-        btn.classList.toggle('text-zinc-700', !active);
-        btn.classList.toggle('dark:text-zinc-300', !active);
-      };
-      setActive(key === chosenPreset);
+      btn.className = 'text-left text-xs px-3 py-2 rounded-md border transition-colors flex items-center justify-between gap-2';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = PRESET_LABELS[key];
+      btn.appendChild(labelSpan);
+      // The recommended pick wears a check mark even when it isn't the
+      // *selected* one, so the affordance reads "this is the suggested
+      // default" without ambiguity.
+      if (key === 'researcher') {
+        const check = document.createElement('span');
+        check.textContent = '✓';
+        check.setAttribute('aria-hidden', 'true');
+        check.className = 'text-emerald-600 dark:text-emerald-400 font-bold';
+        btn.appendChild(check);
+      }
+      setPresetButtonActive(btn, key === chosenPreset);
       btn.addEventListener('click', () => {
         wrap.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((b) => {
-          const active = b === btn;
-          b.classList.toggle('border-emerald-600', active);
-          b.classList.toggle('bg-emerald-50', active);
-          b.classList.toggle('dark:bg-emerald-900/30', active);
-          b.classList.toggle('text-emerald-900', active);
-          b.classList.toggle('dark:text-emerald-100', active);
-          b.classList.toggle('border-zinc-300', !active);
-          b.classList.toggle('dark:border-zinc-700', !active);
-          b.classList.toggle('text-zinc-700', !active);
-          b.classList.toggle('dark:text-zinc-300', !active);
+          setPresetButtonActive(b, b === btn);
         });
+        // Persist immediately to localStorage so the user's pick survives
+        // the rest of the tour (and a "Next" click on this step takes the
+        // chosen preset, not the silent default).
+        try { localStorage.setItem(PRIVACY_PRESET_KEY, key); } catch { /* noop */ }
         persistPreset(key).catch(() => { /* env not configured */ });
       });
       wrap.appendChild(btn);
     }
+    // Mirror the auto-default into localStorage so a user who clicks Next
+    // without touching the buttons still ends up with the researcher pick
+    // recorded — matching the visual "pre-selected" affordance.
+    try {
+      if (!localStorage.getItem(PRIVACY_PRESET_KEY)) {
+        localStorage.setItem(PRIVACY_PRESET_KEY, chosenPreset);
+      }
+    } catch { /* noop */ }
     container.appendChild(wrap);
   }
 
@@ -646,6 +673,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   }
 
   nextBtn.addEventListener('click', () => {
+    // Leaving the privacy_preset step: take the chosen (or default
+    // researcher) preset as a confirmed pick so the DB matches what the
+    // user saw highlighted on the card. persistPreset() is idempotent.
+    const leavingStep = STEPS[current];
+    if (leavingStep?.kind === 'privacy_preset') {
+      persistPreset(chosenPreset).catch(() => { /* env not configured */ });
+    }
     if (current === 0) { go(1); return; }
     if (current >= TOTAL - 1) { hide(); return; }
     go(current + 1);
