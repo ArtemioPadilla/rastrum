@@ -53,7 +53,7 @@ tooltip if the resolved element happens to be hidden.
 | `guide-explore` | `manual-only` | broken-by-design | Current `/explore` is a hub of cards; the s1 (tabs) + s3 (filters) selectors don't match. Tracked for redesign. |
 | `guide-validate` | `first-visit` | auth-gated | Anon visitors silently no-op via the 4s `waitForTarget` timeout. Signed-in audit deferred. |
 | `guide-export` | `first-visit` | auth-gated | Same shape as validate. |
-| `guide-community` | `first-visit` | works | 3 steps; observer card anchor target replaces the dead `[data-follow-btn]` fallback. |
+| `guide-community` | `first-visit` | works | 2 steps (down from 3 — dropped step 3 "Follow"; the observers listing has no follow surface, follow lives on per-observer profile). |
 | `guide-console` | `first-visit` | works | 2 steps (down from 3 — dropped the keyboard-shortcut step; no DOM anchor for it). Signed-in. |
 
 **Replay events:**

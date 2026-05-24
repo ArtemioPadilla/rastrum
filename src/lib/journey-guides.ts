@@ -158,11 +158,10 @@ export const journeyGuides: JourneyGuide[] = [
         titleKey: 'guides.community.step2_title',
         bodyKey: 'guides.community.step2_body',
       },
-      {
-        target: '#community-list a[href*="/profile/u"], [data-observer-card] a',
-        titleKey: 'guides.community.step3_title',
-        bodyKey: 'guides.community.step3_body',
-      },
+      // step 3 ("Follow") dropped — the observers listing has no follow
+      // button surface (follow happens on the per-observer profile page,
+      // not the listing). Verified live 2026-05-23; the orphaned i18n
+      // keys guides.community.step3_* stay in the i18n files harmlessly.
     ],
   },
   {
