@@ -226,6 +226,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 <script>
   import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { resolveFirstVisible } from '../lib/onboarding-target';
+  import { pickDemoSpecies, formatDemoSpeciesLabel } from '../lib/onboarding-demo-species';
 
   type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
 
@@ -257,7 +258,18 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   const labelFirstObsDemoCascade   = dialog.dataset.labelFirstObsDemoCascade   ?? 'Identification cascade';
   const labelFirstObsDemoPlantnet  = dialog.dataset.labelFirstObsDemoPlantnet  ?? 'PlantNet';
   const labelFirstObsDemoClaude    = dialog.dataset.labelFirstObsDemoClaude    ?? 'Claude Haiku';
-  const labelFirstObsDemoResult    = dialog.dataset.labelFirstObsDemoResult    ?? 'Quercus robur \u2014 Oak';
+  // Geo-aware sample species \u2014 biased toward the observer's region so first
+  // impression isn't always Quercus robur. Heuristic: navigator.language /
+  // Intl.Locale().region. Never the Geolocation API (permission prompt on
+  // first visit is hostile UX). Falls back to the i18n string if no match.
+  const i18nResult = dialog.dataset.labelFirstObsDemoResult ?? 'Quercus robur \u2014 Oak';
+  const i18nResultParts = i18nResult.split('\u2014').map((s) => s.trim());
+  const i18nResultFallback = i18nResultParts.length === 2
+    ? { scientific: i18nResultParts[0], common: i18nResultParts[1] }
+    : null;
+  const labelFirstObsDemoResult = formatDemoSpeciesLabel(
+    pickDemoSpecies(typeof navigator !== 'undefined' ? navigator.language : null, i18nResultFallback),
+  );
   const labelFirstObsDemoConfidence = dialog.dataset.labelFirstObsDemoConfidence ?? '87% confidence';
   const labelFirstObsDemoTry       = dialog.dataset.labelFirstObsDemoTry       ?? 'Try it yourself \u2192';
 
