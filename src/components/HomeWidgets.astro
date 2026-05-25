@@ -5,6 +5,7 @@ import HomeChips from './home/HomeChips.astro';
 import HomeRecent from './home/HomeRecent.astro';
 import HomeNearby from './home/HomeNearby.astro';
 import HomeObservadorDelMes from './home/HomeObservadorDelMes.astro';
+import FirstObservationCTA from './home/FirstObservationCTA.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -75,6 +76,8 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 
   <HomeHero lang={lang} />
   <HomeChips lang={lang} />
+
+  <FirstObservationCTA lang={lang} />
 
   <!-- #710 Daily Challenge -->
   <div class="home-widgets-challenge hidden">

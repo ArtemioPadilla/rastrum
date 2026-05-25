@@ -1,0 +1,93 @@
+---
+import { t } from '../../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.home.widgets.first_obs_cta;
+const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
+---
+
+<section
+  class="first-obs-cta hidden mb-6 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/30 p-6 sm:p-8"
+  data-first-obs-cta
+  data-tour-seen-key="rastrum.onboarding.seen"
+  data-tour-seen-value="v1"
+  data-dismissed-key="rastrum.user.onboardingState.firstObsCtaDismissed"
+  aria-labelledby="first-obs-cta-heading"
+>
+  <h2 id="first-obs-cta-heading" class="text-xl sm:text-2xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">
+    {c.heading}
+  </h2>
+  <p class="mt-2 text-sm sm:text-base text-emerald-800/90 dark:text-emerald-200/80">
+    {c.body}
+  </p>
+  <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+    <a
+      href={observeHref}
+      class="inline-flex items-center justify-center rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-2.5 text-sm sm:text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+      data-first-obs-cta-primary
+    >
+      {c.primary}
+    </a>
+    <button
+      type="button"
+      class="text-sm font-medium text-emerald-800/80 dark:text-emerald-300/80 hover:text-emerald-900 dark:hover:text-emerald-100 underline-offset-2 hover:underline"
+      data-first-obs-cta-dismiss
+    >
+      {c.secondary}
+    </button>
+  </div>
+</section>
+
+<script>
+  import { getSupabase, getCachedUser } from '../../lib/supabase';
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('[data-first-obs-cta]');
+    if (!root) return;
+
+    const seenKey = root.dataset.tourSeenKey ?? 'rastrum.onboarding.seen';
+    const seenVal = root.dataset.tourSeenValue ?? 'v1';
+    const dismissedKey = root.dataset.dismissedKey
+      ?? 'rastrum.user.onboardingState.firstObsCtaDismissed';
+
+    let tourSeen = false;
+    let dismissed = false;
+    try {
+      tourSeen = localStorage.getItem(seenKey) === seenVal;
+      dismissed = localStorage.getItem(dismissedKey) === 'true';
+    } catch { /* localStorage unavailable */ }
+
+    if (!tourSeen || dismissed) return;
+
+    const user = await getCachedUser();
+    if (!user) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .select('id')
+        .eq('observer_id', user.id)
+        .limit(1);
+      if (error) return;
+      const hasFirstObs = !!data && data.length > 0;
+      if (hasFirstObs) return;
+    } catch {
+      return;
+    }
+
+    const dismissBtn = root.querySelector<HTMLButtonElement>('[data-first-obs-cta-dismiss]');
+    dismissBtn?.addEventListener('click', () => {
+      try { localStorage.setItem(dismissedKey, 'true'); } catch { /* ignore */ }
+      root.classList.add('hidden');
+    });
+
+    root.classList.remove('hidden');
+  }
+
+  init().catch(() => { /* silent — surface is optional */ });
+</script>
