@@ -1,20 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('console — smoke', () => {
-  test('/en/console/ renders the gate for an unauth visitor', async ({ page }) => {
+  test('/en/console/ renders the anon teaser for an unauth visitor', async ({ page }) => {
     await page.goto('/en/console/');
-    // The gate element exists; either text "Sign in required." or
-    // "You do not have console access." or "Loading…" — all acceptable.
-    const gate = page.locator('#console-gate');
-    await expect(gate).toBeVisible();
-    const txt = await gate.textContent();
-    expect(txt && txt.length > 0).toBe(true);
+    // PBI 4.1: anon visitors now see the #console-anon teaser (rich
+    // "Console — for moderators & admins" card) instead of a gate text.
+    // Signed-in users without roles still get #console-gate with a
+    // "You do not have console access." message — covered separately.
+    const anonOrGate = page.locator('#console-anon:visible, #console-gate:visible');
+    await expect(anonOrGate.first()).toBeVisible();
   });
 
   test('/es/consola/ renders with ES locale', async ({ page }) => {
     await page.goto('/es/consola/');
-    const gate = page.locator('#console-gate');
-    await expect(gate).toBeVisible();
+    const anonOrGate = page.locator('#console-anon:visible, #console-gate:visible');
+    await expect(anonOrGate.first()).toBeVisible();
   });
 
   test('/en/profile/admin/experts/ 308-redirects to /en/console/experts/', async ({ page }) => {
