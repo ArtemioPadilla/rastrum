@@ -320,6 +320,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { resolveFirstVisible } from '../lib/onboarding-target';
   import { pickDemoSpecies, formatDemoSpeciesLabel } from '../lib/onboarding-demo-species';
+  import { computeTooltipPosition } from '../lib/tour-position';
 
   type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
 
@@ -486,11 +487,23 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     );
   }
 
+  function measureInset(selector: string): number {
+    const el = document.querySelector(selector) as HTMLElement | null;
+    if (!el) return 0;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return 0;
+    return r.height;
+  }
+
   function positionTooltip(targetEl: Element | null): void {
     if (!targetEl) {
-      tooltip.style.left   = '50%';
-      tooltip.style.top    = '50%';
-      tooltip.style.transform = 'translate(-50%, -50%)';
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const TW = tooltip.getBoundingClientRect().width  || 320;
+      const TH = tooltip.getBoundingClientRect().height || 180;
+      tooltip.style.left      = `${Math.max(8, vw / 2 - TW / 2)}px`;
+      tooltip.style.top       = `${Math.max(8, vh / 2 - TH / 2) + window.scrollY}px`;
+      tooltip.style.transform = 'none';
       ring.classList.add('hidden');
       ring.classList.remove('onb-pulse');
       backdrop.style.clipPath = 'none';
@@ -498,12 +511,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     }
 
     const tr = getSpotlightRect(targetEl);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
 
-    // Spotlight ring — pulse hint helps the eye find the target on dense
-    // mobile chrome (the bottom-bar FAB in particular). prefers-reduced-motion
-    // is honoured by the CSS rule.
     ring.style.left   = `${tr.left}px`;
     ring.style.top    = `${tr.top  + window.scrollY}px`;
     ring.style.width  = `${tr.width}px`;
@@ -511,7 +519,6 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     ring.classList.remove('hidden');
     ring.classList.add('onb-pulse');
 
-    // Backdrop with circular hole (polygon with outer box + inner rect)
     if (!reduced) {
       const x0 = tr.left;   const y0 = tr.top;
       const x1 = tr.right;  const y1 = tr.bottom;
@@ -525,29 +532,22 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       backdrop.style.clipPath = 'none';
     }
 
-    // Tooltip placement: prefer below or above the spotlight rect
-    const TW = tooltip.getBoundingClientRect().width || 320;
+    const TW = tooltip.getBoundingClientRect().width  || 320;
     const TH = tooltip.getBoundingClientRect().height || 180;
-    const MARGIN = 12;
 
-    let tx: number;
-    let ty: number;
+    const headerEl     = document.querySelector('header') as HTMLElement | null;
+    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+    const bottomBarHeight = measureInset('#mobile-bottom-bar');
 
-    // Horizontal: center on target, clamp to viewport
-    tx = tr.left + tr.width / 2 - TW / 2;
-    tx = Math.max(MARGIN, Math.min(tx, vw - TW - MARGIN));
+    const pos = computeTooltipPosition(
+      { left: tr.left, top: tr.top, width: tr.width, height: tr.height },
+      { width: TW, height: TH },
+      { width: window.innerWidth, height: window.innerHeight },
+      { headerHeight, bottomBarHeight },
+    );
 
-    // Vertical: prefer below, fall back to above, then center
-    if (tr.bottom + MARGIN + TH <= vh) {
-      ty = tr.bottom + MARGIN;
-    } else if (tr.top - MARGIN - TH >= 0) {
-      ty = tr.top - MARGIN - TH;
-    } else {
-      ty = Math.max(MARGIN, Math.min(vh / 2 - TH / 2, vh - TH - MARGIN));
-    }
-
-    tooltip.style.left      = `${tx}px`;
-    tooltip.style.top       = `${ty + window.scrollY}px`;
+    tooltip.style.left      = `${pos.left}px`;
+    tooltip.style.top       = `${pos.top + window.scrollY}px`;
     tooltip.style.transform = 'none';
   }
 
