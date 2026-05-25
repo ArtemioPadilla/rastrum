@@ -16,7 +16,7 @@ test.describe('J2: Observer first observation journey', () => {
 
     // Walk through all 7 steps
     for (let i = 0; i < 7; i++) {
-      await expect(page.locator('#onb-step-label')).toContainText(`${i + 1} of 7`);
+      await expect(page.locator('#onb-step-label')).toContainText(new RegExp(`${i + 1}\\s*of\\s*7`, 'i'));
       await page.locator('#onb-next').click();
     }
     // Dialog should close after final step

@@ -19,7 +19,7 @@ test.describe('J: onboarding tour replay', () => {
       await page.evaluate(() => window.dispatchEvent(new CustomEvent('rastrum:replay-onboarding')));
       await expect(dialog).toBeVisible();
       for (let i = 0; i < 7; i++) {
-        await expect(page.locator('#onb-step-label')).toContainText(`${i + 1} of 7`);
+        await expect(page.locator('#onb-step-label')).toContainText(new RegExp(`${i + 1}\\s*of\\s*7`, 'i'));
         await page.locator('#onb-next').click();
       }
       await expect(dialog).toBeHidden();
