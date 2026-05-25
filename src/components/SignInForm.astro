@@ -66,9 +66,23 @@ const tr = t(lang);
 
   <!-- Code step -->
   <form id="code-form" class="hidden space-y-4 mt-2" novalidate>
-    <div class="rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+    <div
+      id="rastrum-signin-confirmation"
+      class="rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-900/20 p-4"
+      data-template-en="📩 Code sent to <strong>{email}</strong>. Should arrive in ~30s. Check spam if not."
+      data-template-es="📩 Código enviado a <strong>{email}</strong>. Debería llegar en ~30s. Revisa tu spam si no aparece."
+    >
       <h2 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{tr.auth.code_sent_title}</h2>
-      <p id="sent-body" class="mt-1 text-sm text-emerald-800 dark:text-emerald-300"></p>
+      <p id="sent-body" class="mt-1 text-sm text-emerald-800 dark:text-emerald-300" aria-live="polite"></p>
+      <div class="mt-3 text-xs text-emerald-800 dark:text-emerald-300">
+        <span id="resend-wait" class="hidden"
+          data-template-en="Wait {seconds}s before resending"
+          data-template-es="Espera {seconds}s para reenviar"
+        ></span>
+        <button type="button" id="resend-btn" class="hidden underline underline-offset-2 hover:text-emerald-900 dark:hover:text-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed">
+          <span data-label>{lang === 'es' ? 'Reenviar código' : 'Resend code'}</span>
+        </button>
+      </div>
     </div>
     <div>
       <label for="code" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -126,6 +140,10 @@ const tr = t(lang);
   const verifyLabel= verifyBtn?.querySelector('[data-label]') as HTMLElement | null;
   const codeErr    = document.getElementById('code-err') as HTMLParagraphElement | null;
   const sentBody   = document.getElementById('sent-body') as HTMLElement | null;
+  const confirmBox = document.getElementById('rastrum-signin-confirmation') as HTMLElement | null;
+  const resendBtn  = document.getElementById('resend-btn') as HTMLButtonElement | null;
+  const resendLabel = resendBtn?.querySelector('[data-label]') as HTMLElement | null;
+  const resendWait = document.getElementById('resend-wait') as HTMLElement | null;
   const backBtn    = document.getElementById('back-btn');
 
   const isEs = document.documentElement.lang === 'es';
@@ -136,6 +154,49 @@ const tr = t(lang);
   }
 
   let pendingEmail = '';
+  let resendTimer: ReturnType<typeof setInterval> | null = null;
+  const RESEND_COOLDOWN_MS = 60 * 1000;
+
+  function clearResendTimer() {
+    if (resendTimer !== null) {
+      clearInterval(resendTimer);
+      resendTimer = null;
+    }
+  }
+
+  function renderConfirmation(email: string) {
+    if (!confirmBox || !sentBody) return;
+    const tplAttr = isEs ? 'data-template-es' : 'data-template-en';
+    const tpl = confirmBox.getAttribute(tplAttr) ?? '';
+    sentBody.innerHTML = tpl.replace('{email}', email);
+  }
+
+  function startResendCooldown() {
+    if (!resendBtn || !resendWait) return;
+    clearResendTimer();
+    const tplAttr = isEs ? 'data-template-es' : 'data-template-en';
+    const waitTpl = resendWait.getAttribute(tplAttr) ?? '';
+    let remaining = Math.floor(RESEND_COOLDOWN_MS / 1000);
+
+    const paint = () => {
+      if (remaining > 0) {
+        resendWait.textContent = waitTpl.replace('{seconds}', String(remaining));
+        resendWait.classList.remove('hidden');
+        resendBtn.classList.add('hidden');
+      } else {
+        resendWait.classList.add('hidden');
+        resendBtn.classList.remove('hidden');
+        resendBtn.disabled = false;
+        clearResendTimer();
+      }
+    };
+
+    paint();
+    resendTimer = setInterval(() => {
+      remaining -= 1;
+      paint();
+    }, 1000);
+  }
 
   // ── OAuth ──
   googleBtn?.addEventListener('click', async () => {
@@ -186,24 +247,41 @@ const tr = t(lang);
     window.posthog?.capture('sign_in_initiated', { method: 'email_otp' });
 
     const { error } = await requestEmailOtp(email);
-    sendBtn.disabled = false;
-    sendLabel.textContent = isEs ? 'Enviar código' : 'Send code';
     if (error) {
+      sendBtn.disabled = false;
+      sendLabel.textContent = isEs ? 'Enviar código' : 'Send code';
       window.posthog?.capture('sign_in_failed', { method: 'email_otp', error: error.message });
       if (emailErr) { emailErr.textContent = error.message; emailErr.classList.remove('hidden'); }
       return;
     }
 
+    sendBtn.disabled = true;
+    sendLabel.textContent = isEs ? 'Enviar código' : 'Send code';
     pendingEmail = email;
     emailForm.classList.add('hidden');
     codeForm?.classList.remove('hidden');
-    if (sentBody) {
-      const tpl = isEs
-        ? 'Enviamos un código de 6 dígitos a {email}. Pégalo abajo — o haz clic en el enlace mágico del correo.'
-        : 'We sent a 6-digit code to {email}. Paste it below — or click the magic link in the email.';
-      sentBody.textContent = tpl.replace('{email}', email);
-    }
+    renderConfirmation(email);
+    startResendCooldown();
     codeInput?.focus();
+  });
+
+  resendBtn?.addEventListener('click', async () => {
+    if (!pendingEmail || !resendBtn || !resendLabel) return;
+    resendBtn.disabled = true;
+    const originalLabel = resendLabel.textContent;
+    resendLabel.textContent = isEs ? 'Enviando…' : 'Sending…';
+    codeErr?.classList.add('hidden');
+    window.posthog?.capture('sign_in_initiated', { method: 'email_otp_resend' });
+    const { error } = await requestEmailOtp(pendingEmail);
+    resendLabel.textContent = originalLabel;
+    if (error) {
+      resendBtn.disabled = false;
+      window.posthog?.capture('sign_in_failed', { method: 'email_otp_resend', error: error.message });
+      if (codeErr) { codeErr.textContent = error.message; codeErr.classList.remove('hidden'); }
+      return;
+    }
+    renderConfirmation(pendingEmail);
+    startResendCooldown();
   });
 
   // ── OTP verify ──
@@ -237,5 +315,9 @@ const tr = t(lang);
     codeForm?.classList.add('hidden');
     emailForm?.classList.remove('hidden');
     if (codeInput) codeInput.value = '';
+    clearResendTimer();
+    resendBtn?.classList.add('hidden');
+    resendWait?.classList.add('hidden');
+    if (sendBtn) sendBtn.disabled = false;
   });
 </script>
