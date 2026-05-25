@@ -37,6 +37,23 @@ const weathers = WEATHERS;
     {isEs ? "Registrar observación" : "Log observation"}
   </h1>
 
+  <!-- Guided first observation (demo mode) — revealed by ?onb=demo from the
+       onboarding tour. The two banners are pure UI; the cascade itself runs
+       through the unmodified pipeline (no DB writes from demo mode — the
+       observer chooses to save or "try with my own photo"). -->
+  <div id="obs2-demo-banner" class="hidden rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-4 text-sm text-emerald-800 dark:text-emerald-200">
+    {tr.observe.demo.banner_lesson}
+  </div>
+  <div id="obs2-demo-completed" class="hidden rounded-xl border border-emerald-400 dark:border-emerald-600 bg-emerald-100 dark:bg-emerald-900/60 p-4 flex items-center gap-3">
+    <span class="text-sm font-semibold text-emerald-900 dark:text-emerald-100 flex-1">
+      {tr.observe.demo.banner_completed}
+    </span>
+    <a id="obs2-demo-try-own" href={lang === 'es' ? '/observar/' : '/observe/'}
+       class="min-h-[40px] inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+      {tr.observe.demo.cta_try_own} →
+    </a>
+  </div>
+
   <!-- Resume in-progress banner -->
   <div id="obs2-resume-banner" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4 flex items-center gap-3">
     <span class="text-amber-700 dark:text-amber-300 text-sm flex-1">
@@ -684,6 +701,37 @@ if (identifyMode) {
   // skipSaveBtn removed (#942 PR7)
 }
 
+// ── Guided first observation (demo mode) ──────────────────────────────────
+// Triggered by ?onb=demo from the onboarding tour. Pre-loads a sample image,
+// auto-fires the existing files-dropped event (so the unmodified cascade
+// runs end-to-end), and reveals the "completed" banner once the post-form
+// appears. Never persists to the outbox — the observer is told to "take
+// your own photo" via the CTA, which clears ?onb=demo and resets the form.
+const demoMode = new URLSearchParams(window.location.search).get('onb') === 'demo';
+const demoBanner    = document.getElementById('obs2-demo-banner');
+const demoCompleted = document.getElementById('obs2-demo-completed');
+if (demoMode) {
+  demoBanner?.classList.remove('hidden');
+  // Defer to next tick so DropZone has wired its rastrum:files-dropped
+  // listener (both DropZone and ObserveView2 attach listeners at module
+  // init — order isn't guaranteed across Astro <script> tags).
+  setTimeout(() => { void loadDemoImage(); }, 50);
+}
+
+async function loadDemoImage(): Promise<void> {
+  try {
+    const url = '/rastrum-logo-512.png';
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const file = new File([blob], 'rastrum-demo-leaf.png', { type: blob.type || 'image/png' });
+    document.dispatchEvent(new CustomEvent('rastrum:files-dropped', { detail: { files: [file] } }));
+  } catch {
+    // Sample asset missing — silently drop demo mode (the lesson banner
+    // stays visible so the user at least sees the explanation).
+  }
+}
+
 // ── One-shot migration notice for users who used "Just identify, don't save" (#942 PR7) ──
 // Shows once per device after the skip-save button was removed. Directs them to ?mode=identify.
 const SKIP_SAVE_MIGRATION_KEY = 'rastrum_identify_mode_notice_v1';
@@ -1161,6 +1209,9 @@ function showPostForm() {
   // change yet (consumers wire in #1123). Never blocks the form.
   redispatchCardVm();
   postForm?.classList.remove('hidden');
+  // Demo mode: the cascade finished — celebrate + offer "try with your
+  // own photo". The lesson banner stays visible above for context.
+  if (demoMode) demoCompleted?.classList.remove('hidden');
   // id card is always shown so user can always enter/edit species
   if (bestResult) {
     const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;

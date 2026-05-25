@@ -156,10 +156,23 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   <!-- Spotlight ring (visible border around the highlighted element) -->
   <div
     id="onb-spotlight-ring"
-    class="absolute pointer-events-none rounded-xl border-2 border-emerald-400 transition-all duration-200 hidden"
+    class="onb-spotlight-ring absolute pointer-events-none rounded-xl border-2 border-emerald-400 transition-all duration-200 hidden"
     style="box-shadow: 0 0 0 4px rgba(52,211,153,0.25);"
     aria-hidden="true"
   ></div>
+
+  <style>
+    @keyframes onb-spotlight-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.25); }
+      50%      { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0.10); }
+    }
+    .onb-spotlight-ring.onb-pulse {
+      animation: onb-spotlight-pulse 1.8s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .onb-spotlight-ring.onb-pulse { animation: none; }
+    }
+  </style>
 
   <!-- Tooltip card -->
   <div
@@ -306,6 +319,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 <script>
   import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { resolveFirstVisible } from '../lib/onboarding-target';
+  import { pickDemoSpecies, formatDemoSpeciesLabel } from '../lib/onboarding-demo-species';
 
   type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
 
@@ -331,13 +345,24 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   const labelDone  = dialog.dataset.labelDone  ?? 'Done';
   const labelBack  = dialog.dataset.labelBack  ?? 'Back';
   const labelStart = dialog.dataset.labelStart ?? 'Start';
-  const stepTpl    = dialog.dataset.stepLabel  ?? 'Step {current} of {total}';
+  const stepTpl    = dialog.dataset.stepLabel  ?? 'STEP {current} OF {total}';
   const dotAriaTpl = dialog.dataset.dotAria    ?? 'Step {n}';
 
   const labelFirstObsDemoCascade   = dialog.dataset.labelFirstObsDemoCascade   ?? 'Identification cascade';
   const labelFirstObsDemoPlantnet  = dialog.dataset.labelFirstObsDemoPlantnet  ?? 'PlantNet';
   const labelFirstObsDemoClaude    = dialog.dataset.labelFirstObsDemoClaude    ?? 'Claude Haiku';
-  const labelFirstObsDemoResult    = dialog.dataset.labelFirstObsDemoResult    ?? 'Quercus robur \u2014 Oak';
+  // Geo-aware sample species \u2014 biased toward the observer's region so first
+  // impression isn't always Quercus robur. Heuristic: navigator.language /
+  // Intl.Locale().region. Never the Geolocation API (permission prompt on
+  // first visit is hostile UX). Falls back to the i18n string if no match.
+  const i18nResult = dialog.dataset.labelFirstObsDemoResult ?? 'Quercus robur \u2014 Oak';
+  const i18nResultParts = i18nResult.split('\u2014').map((s) => s.trim());
+  const i18nResultFallback = i18nResultParts.length === 2
+    ? { scientific: i18nResultParts[0], common: i18nResultParts[1] }
+    : null;
+  const labelFirstObsDemoResult = formatDemoSpeciesLabel(
+    pickDemoSpecies(typeof navigator !== 'undefined' ? navigator.language : null, i18nResultFallback),
+  );
   const labelFirstObsDemoConfidence = dialog.dataset.labelFirstObsDemoConfidence ?? '87% confidence';
   const labelFirstObsDemoTry       = dialog.dataset.labelFirstObsDemoTry       ?? 'Try it yourself \u2192';
 
@@ -467,6 +492,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       tooltip.style.top    = '50%';
       tooltip.style.transform = 'translate(-50%, -50%)';
       ring.classList.add('hidden');
+      ring.classList.remove('onb-pulse');
       backdrop.style.clipPath = 'none';
       return;
     }
@@ -475,12 +501,15 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // Spotlight ring
+    // Spotlight ring — pulse hint helps the eye find the target on dense
+    // mobile chrome (the bottom-bar FAB in particular). prefers-reduced-motion
+    // is honoured by the CSS rule.
     ring.style.left   = `${tr.left}px`;
     ring.style.top    = `${tr.top  + window.scrollY}px`;
     ring.style.width  = `${tr.width}px`;
     ring.style.height = `${tr.height}px`;
     ring.classList.remove('hidden');
+    ring.classList.add('onb-pulse');
 
     // Backdrop with circular hole (polygon with outer box + inner rect)
     if (!reduced) {
@@ -571,45 +600,72 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     } catch { /* env not configured / column missing — fail closed */ }
   }
 
+  function setPresetButtonActive(btn: HTMLButtonElement, active: boolean): void {
+    btn.classList.toggle('border-emerald-600', active);
+    btn.classList.toggle('bg-emerald-50', active);
+    btn.classList.toggle('dark:bg-emerald-900/30', active);
+    btn.classList.toggle('text-emerald-900', active);
+    btn.classList.toggle('dark:text-emerald-100', active);
+    btn.classList.toggle('ring-2', active);
+    btn.classList.toggle('ring-emerald-500', active);
+    btn.classList.toggle('border-zinc-300', !active);
+    btn.classList.toggle('dark:border-zinc-700', !active);
+    btn.classList.toggle('text-zinc-700', !active);
+    btn.classList.toggle('dark:text-zinc-300', !active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+
   function renderPresetButtons(container: HTMLElement): void {
     container.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'mt-3 flex flex-col gap-1.5';
+    // Hydrate any prior choice from localStorage (replay-tour case) so the
+    // researcher default doesn't silently overwrite a user's earlier pick.
+    try {
+      const stored = localStorage.getItem(PRIVACY_PRESET_KEY);
+      if (stored === 'open_scientist' || stored === 'researcher' || stored === 'private_observer') {
+        chosenPreset = stored;
+      }
+    } catch { /* noop */ }
     for (const key of PRESET_KEYS) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.preset = key;
-      btn.className = 'text-left text-xs px-3 py-2 rounded-md border transition-colors';
-      btn.textContent = PRESET_LABELS[key];
-      const setActive = (active: boolean) => {
-        btn.classList.toggle('border-emerald-600', active);
-        btn.classList.toggle('bg-emerald-50', active);
-        btn.classList.toggle('dark:bg-emerald-900/30', active);
-        btn.classList.toggle('text-emerald-900', active);
-        btn.classList.toggle('dark:text-emerald-100', active);
-        btn.classList.toggle('border-zinc-300', !active);
-        btn.classList.toggle('dark:border-zinc-700', !active);
-        btn.classList.toggle('text-zinc-700', !active);
-        btn.classList.toggle('dark:text-zinc-300', !active);
-      };
-      setActive(key === chosenPreset);
+      btn.className = 'text-left text-xs px-3 py-2 rounded-md border transition-colors flex items-center justify-between gap-2';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = PRESET_LABELS[key];
+      btn.appendChild(labelSpan);
+      // The recommended pick wears a check mark even when it isn't the
+      // *selected* one, so the affordance reads "this is the suggested
+      // default" without ambiguity.
+      if (key === 'researcher') {
+        const check = document.createElement('span');
+        check.textContent = '✓';
+        check.setAttribute('aria-hidden', 'true');
+        check.className = 'text-emerald-600 dark:text-emerald-400 font-bold';
+        btn.appendChild(check);
+      }
+      setPresetButtonActive(btn, key === chosenPreset);
       btn.addEventListener('click', () => {
         wrap.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((b) => {
-          const active = b === btn;
-          b.classList.toggle('border-emerald-600', active);
-          b.classList.toggle('bg-emerald-50', active);
-          b.classList.toggle('dark:bg-emerald-900/30', active);
-          b.classList.toggle('text-emerald-900', active);
-          b.classList.toggle('dark:text-emerald-100', active);
-          b.classList.toggle('border-zinc-300', !active);
-          b.classList.toggle('dark:border-zinc-700', !active);
-          b.classList.toggle('text-zinc-700', !active);
-          b.classList.toggle('dark:text-zinc-300', !active);
+          setPresetButtonActive(b, b === btn);
         });
+        // Persist immediately to localStorage so the user's pick survives
+        // the rest of the tour (and a "Next" click on this step takes the
+        // chosen preset, not the silent default).
+        try { localStorage.setItem(PRIVACY_PRESET_KEY, key); } catch { /* noop */ }
         persistPreset(key).catch(() => { /* env not configured */ });
       });
       wrap.appendChild(btn);
     }
+    // Mirror the auto-default into localStorage so a user who clicks Next
+    // without touching the buttons still ends up with the researcher pick
+    // recorded — matching the visual "pre-selected" affordance.
+    try {
+      if (!localStorage.getItem(PRIVACY_PRESET_KEY)) {
+        localStorage.setItem(PRIVACY_PRESET_KEY, chosenPreset);
+      }
+    } catch { /* noop */ }
     container.appendChild(wrap);
   }
 
@@ -658,10 +714,22 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     ].join('');
     wrap.appendChild(result);
 
-    // CTA note
-    const cta = document.createElement('p');
-    cta.className = 'mt-2 text-xs text-zinc-500 dark:text-zinc-400 italic';
+    // CTA — anchor that lands on /observe/?onb=demo so the observer
+    // immediately runs the cascade on a pre-loaded photo (guided first
+    // observation). Mark the tour seen before navigating so it doesn't
+    // re-pop on the destination page; the navigation acts as the
+    // step's "completed" outcome.
+    const demoLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+    const demoHref = demoLang === 'es' ? '/observar/?onb=demo' : '/observe/?onb=demo';
+    const cta = document.createElement('a');
+    cta.href = demoHref;
+    cta.className = 'mt-3 inline-flex items-center text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline';
     cta.textContent = labelFirstObsDemoTry;
+    cta.addEventListener('click', () => {
+      markSeen();
+      persistOnboardingDone().catch(() => { /* env not configured */ });
+      try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: 'completed_via_demo', step: current } })); } catch { /* noop */ }
+    });
     container.appendChild(wrap);
     container.appendChild(cta);
   }
@@ -750,6 +818,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   function hide(): void {
     dialog.classList.add('hidden');
     ring.classList.add('hidden');
+    ring.classList.remove('onb-pulse');
     backdrop.style.clipPath = 'none';
     unlockScroll();
     markSeen();
@@ -774,6 +843,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   }
 
   nextBtn.addEventListener('click', () => {
+    // Leaving the privacy_preset step: take the chosen (or default
+    // researcher) preset as a confirmed pick so the DB matches what the
+    // user saw highlighted on the card. persistPreset() is idempotent.
+    const leavingStep = STEPS[current];
+    if (leavingStep?.kind === 'privacy_preset') {
+      persistPreset(chosenPreset).catch(() => { /* env not configured */ });
+    }
     if (current === 0) { go(1); return; }
     if (current >= TOTAL - 1) { hide(); return; }
     go(current + 1);

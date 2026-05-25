@@ -16,8 +16,8 @@ interface Props {
 const { lang } = Astro.props;
 
 const labels = {
-  en: { next: 'Next', done: 'Done', skip: 'Skip guide', stepOf: 'Step {current} of {total}', close: 'Close guide' },
-  es: { next: 'Siguiente', done: 'Listo', skip: 'Saltar guía', stepOf: 'Paso {current} de {total}', close: 'Cerrar guía' },
+  en: { next: 'Next', done: 'Done', skip: 'Skip guide', stepOf: 'STEP {current} OF {total}', close: 'Close guide' },
+  es: { next: 'Siguiente', done: 'Listo', skip: 'Saltar guía', stepOf: 'PASO {current} DE {total}', close: 'Cerrar guía' },
 };
 const l = labels[lang] ?? labels.en;
 ---
@@ -90,7 +90,7 @@ const l = labels[lang] ?? labels.en;
     const labelNext = root.dataset.labelNext ?? 'Next';
     const labelDone = root.dataset.labelDone ?? 'Done';
     const labelSkip = root.dataset.labelSkip ?? 'Skip guide';
-    const stepTpl = root.dataset.labelStepOf ?? 'Step {current} of {total}';
+    const stepTpl = root.dataset.labelStepOf ?? 'STEP {current} OF {total}';
 
     let steps: GuideStep[] = [];
     let current = 0;
