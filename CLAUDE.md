@@ -399,6 +399,19 @@ The onboarding tour exposes two public DOM events:
 that takes an Anthropic key — it's a `max_tokens:1` probe that costs
 ≈ nothing per call. Reuse it before persisting any BYO key.
 
+**`src/lib/onboarding-state.ts` is the centralised onboarding/user-state
+store.** Replaces the 18 ad-hoc `rastrum.*` localStorage keys
+(`rastrum.onboarding.seen`, `rastrum.console.onboardingDone`,
+`rastrum.obs2.onboarding_shown`, every `rastrum.guide.*`, `rastrum.visitCount`,
+`rastrum.installHintDismissed`, etc.) with a single typed JSON document
+under `rastrum.user.onboardingState`. The first read does a one-time
+non-destructive migration from the legacy keys; legacy reads still work
+during the gradual call-site port. Use `getOnboardingState()`,
+`setOnboardingState(patch)`, and the convenience accessors
+(`markTourCompleted`, `markGuideSeen`, `incrementVisitCount`, …) for any
+new UX-state flag — do NOT mint a new top-level `rastrum.*` key.
+Full notes: [`docs/runbooks/onboarding-state.md`](docs/runbooks/onboarding-state.md).
+
 Full notes: [`docs/runbooks/onboarding-events.md`](docs/runbooks/onboarding-events.md).
 
 CI runs **`infra/smoke-model-assets.sh`** after every deploy and during
