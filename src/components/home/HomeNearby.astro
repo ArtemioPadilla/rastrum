@@ -4,14 +4,12 @@
  *
  * Issue #712: Deeper location integration.
  *
- * Fires after `navigator.geolocation` resolves (non-blocking — home
- * page loads fully without it). Queries `observations` within the
- * configured radius (default 10 km) via Supabase PostGIS RPC
- * `nearby_observations(lat, lng, radius_km, limit)`.
- *
- * Location coordinates are stored in `sessionStorage` (key:
- * `rastrum.user_location`) and refreshed every 5 minutes so subsequent
- * navigation within the session is fast.
+ * PBI 1.3 (Lighthouse `geolocation-on-start`): geolocation is now
+ * deferred behind an explicit user click on the "Show observations near
+ * me" CTA — the page renders the section's header + CTA on load but
+ * never calls `navigator.geolocation.getCurrentPosition` until the
+ * user opts in. A cached location from a prior visit (sessionStorage
+ * `rastrum.user_location`, 5-minute TTL) is honoured without prompting.
  *
  * Species chips use location context (already implemented — see
  * HomeChips.astro + `src/lib/suggestions.ts`). This component adds the
@@ -48,6 +46,8 @@ const shareBase = '/share/obs/';
   data-label-no-location={w.near_you_no_location ?? 'Enable location to see nearby observations.'}
   data-label-km-away={w.near_you_km_away ?? '{{dist}} km away'}
   data-label-view-all={w.near_you_view_all ?? 'View on map'}
+  data-label-show-nearby={w.near_you_show_nearby ?? 'Show observations near me'}
+  data-label-locating={w.near_you_locating ?? 'Getting your location…'}
   aria-live="polite"
 >
   <div class="flex items-baseline justify-between gap-3 mb-3">
@@ -62,7 +62,14 @@ const shareBase = '/share/obs/';
     </a>
   </div>
   <p class="hn-subtitle mb-3 text-xs text-zinc-500 dark:text-zinc-400"></p>
-  <p class="hn-loading text-sm text-zinc-500 dark:text-zinc-400">
+  <button
+    type="button"
+    class="hn-show-cta inline-flex items-center gap-2 rounded-full border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+  >
+    <span aria-hidden="true">📍</span>
+    <span>{w.near_you_show_nearby ?? 'Show observations near me'}</span>
+  </button>
+  <p class="hn-loading hidden text-sm text-zinc-500 dark:text-zinc-400">
     {w.near_you_loading ?? 'Finding nearby observations…'}
   </p>
   <p class="hn-empty hidden text-sm text-zinc-500 dark:text-zinc-400"></p>
@@ -180,10 +187,11 @@ const shareBase = '/share/obs/';
     </li>`;
   }
 
-  async function init() {
-    const root = document.querySelector<HTMLElement>('.hn-root');
-    if (!root) return;
-
+  async function loadNearby(
+    root: HTMLElement,
+    lat: number,
+    lng: number,
+  ): Promise<void> {
     const lang = (root.dataset.lang as Lang) ?? 'en';
     const radiusKm = Number(root.dataset.radius ?? 10);
     const lim = Number(root.dataset.limit ?? 6);
@@ -193,37 +201,18 @@ const shareBase = '/share/obs/';
     const loadingEl = root.querySelector<HTMLElement>('.hn-loading');
     const emptyEl = root.querySelector<HTMLElement>('.hn-empty');
     const noLocEl = root.querySelector<HTMLElement>('.hn-no-location');
-    const subtitleEl = root.querySelector<HTMLElement>('.hn-subtitle');
     const listEl = root.querySelector<HTMLUListElement>('.hn-list');
     const mapLink = root.querySelector<HTMLAnchorElement>('.hn-map-link');
     if (!listEl) return;
 
-    // Update subtitle with radius
-    if (subtitleEl) {
-      const tpl = root.dataset.labelSubtitle ?? '';
-      subtitleEl.textContent = tpl.replace('{{radius}}', String(radiusKm));
-    }
+    noLocEl?.classList.add('hidden');
+    loadingEl?.classList.remove('hidden');
 
-    // Show section skeleton while waiting for geolocation
-    root.classList.remove('hidden');
-
-    // Get location — non-blocking; if user denies we show the no-location message.
-    let lat: number, lng: number;
-    try {
-      ({ lat, lng } = await getLocation());
-    } catch {
-      loadingEl?.classList.add('hidden');
-      noLocEl?.classList.remove('hidden');
-      return;
-    }
-
-    // Update map link to include location context
     if (mapLink) {
       mapLink.href = `${mapHref}?lat=${lat}&lng=${lng}&radius=${radiusKm}`;
       mapLink.classList.remove('hidden');
     }
 
-    // Query nearby observations via Supabase PostGIS RPC.
     let supabase;
     try { supabase = getSupabase(); } catch {
       loadingEl?.classList.add('hidden');
@@ -273,7 +262,6 @@ const shareBase = '/share/obs/';
       common_name_es: r.common_name_es,
       photo_url: r.photo_url,
       observed_at: r.observed_at,
-      // Use PostGIS distance if available, otherwise compute client-side.
       distance_m: r.distance_m
         ?? (r.lat != null && r.lng != null
           ? haversineKm(lat, lng, r.lat, r.lng) * 1000
@@ -285,5 +273,45 @@ const shareBase = '/share/obs/';
       .join('');
   }
 
-  init().catch(() => {});
+  function init(): void {
+    const root = document.querySelector<HTMLElement>('.hn-root');
+    if (!root) return;
+
+    const radiusKm = Number(root.dataset.radius ?? 10);
+    const subtitleEl = root.querySelector<HTMLElement>('.hn-subtitle');
+    const ctaBtn = root.querySelector<HTMLButtonElement>('.hn-show-cta');
+    const loadingEl = root.querySelector<HTMLElement>('.hn-loading');
+    const noLocEl = root.querySelector<HTMLElement>('.hn-no-location');
+
+    if (subtitleEl) {
+      const tpl = root.dataset.labelSubtitle ?? '';
+      subtitleEl.textContent = tpl.replace('{{radius}}', String(radiusKm));
+    }
+
+    root.classList.remove('hidden');
+
+    // PBI 1.3: never call getCurrentPosition on load. Honour a cached
+    // location from a prior session (sessionStorage, 5-min TTL) without
+    // prompting; otherwise wait for the user to click the CTA.
+    const cached = getCachedLocation();
+    if (cached) {
+      ctaBtn?.classList.add('hidden');
+      loadNearby(root, cached.lat, cached.lng).catch(() => {});
+      return;
+    }
+
+    ctaBtn?.addEventListener('click', () => {
+      ctaBtn.disabled = true;
+      ctaBtn.classList.add('hidden');
+      loadingEl?.classList.remove('hidden');
+      getLocation()
+        .then(({ lat, lng }) => loadNearby(root, lat, lng))
+        .catch(() => {
+          loadingEl?.classList.add('hidden');
+          noLocEl?.classList.remove('hidden');
+        });
+    });
+  }
+
+  init();
 </script>

@@ -101,17 +101,26 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     data-label-no-location={suggestions.no_location}
     data-label-loading={suggestions.loading}
     data-label-empty={suggestions.empty}
+    data-label-show={suggestions.show ?? 'Show suggestions for my area'}
   >
     <div class="flex items-baseline justify-between gap-3 mb-3">
       <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{suggestions.heading}</h2>
       <button
         type="button"
-        class="hw-suggestions-refresh text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+        class="hw-suggestions-refresh hidden text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
       >{suggestions.refresh}</button>
     </div>
     <p class="hw-suggestions-subtitle text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
-    <p class="hw-suggestions-loading text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
+    <button
+      type="button"
+      class="hw-suggestions-show inline-flex items-center gap-2 rounded-full border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+    >
+      <span aria-hidden="true">📍</span>
+      <span>{suggestions.show ?? 'Show suggestions for my area'}</span>
+    </button>
+    <p class="hw-suggestions-loading hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
     <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
+    <p class="hw-suggestions-no-location hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.no_location}</p>
     <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
   </div>
 
@@ -239,11 +248,47 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     return new Date().toLocaleString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'long' });
   }
 
+  const SUGGESTIONS_LOC_KEY = 'rastrum.user_location';
+  const SUGGESTIONS_LOC_TTL_MS = 5 * 60 * 1000;
+
+  function getCachedSuggestionsLoc(): { lat: number; lng: number } | null {
+    try {
+      const raw = sessionStorage.getItem(SUGGESTIONS_LOC_KEY);
+      if (!raw) return null;
+      const loc = JSON.parse(raw) as { lat: number; lng: number; ts: number };
+      if (Date.now() - loc.ts > SUGGESTIONS_LOC_TTL_MS) return null;
+      return { lat: loc.lat, lng: loc.lng };
+    } catch {
+      return null;
+    }
+  }
+
+  async function requestSuggestionsLocation(): Promise<{ lat: number; lng: number }> {
+    const cached = getCachedSuggestionsLoc();
+    if (cached) return cached;
+    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 8000,
+        maximumAge: SUGGESTIONS_LOC_TTL_MS,
+      });
+    });
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    try {
+      sessionStorage.setItem(
+        SUGGESTIONS_LOC_KEY,
+        JSON.stringify({ lat, lng, ts: Date.now() }),
+      );
+    } catch { /* quota — ignore */ }
+    return { lat, lng };
+  }
+
   async function paintSuggestions(
     root: HTMLElement,
     lang: Lang,
     userId: string,
-    seed: number
+    seed: number,
+    loc: { lat: number; lng: number },
   ): Promise<void> {
     const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
     if (!sugRoot) return;
@@ -252,6 +297,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     const loadingEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-loading');
     const emptyEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-empty');
     const subtitleEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-subtitle');
+    const refreshBtn = sugRoot.querySelector<HTMLButtonElement>('.hw-suggestions-refresh');
     if (!listEl) return;
 
     if (subtitleEl) {
@@ -263,28 +309,14 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     emptyEl?.classList.add('hidden');
     listEl.innerHTML = '';
 
-    let lat: number, lng: number;
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 8000,
-          maximumAge: 5 * 60 * 1000,
-        });
-      });
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    } catch {
-      loadingEl?.classList.add('hidden');
-      return;
-    }
-
     try {
       const limit = 10 + (seed % 5);
-      const all = await fetchSuggestions(userId, lat, lng, { limit });
+      const all = await fetchSuggestions(userId, loc.lat, loc.lng, { limit });
       const dismissed = getDismissed();
       const filtered = all.filter(s => !dismissed.has(s.taxon_id)).slice(0, 5);
 
       loadingEl?.classList.add('hidden');
+      refreshBtn?.classList.remove('hidden');
 
       if (filtered.length === 0) {
         emptyEl?.classList.remove('hidden');
@@ -622,15 +654,43 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     await paintNextBadge(root, lang, user.id);
     await paintChallenge(root, lang, user.id);
 
-    // Suggestions runs in parallel via geolocation; doesn't block.
+    // PBI 1.3: never call geolocation on load. Honour a cached
+    // location from a prior session; otherwise wait for an explicit
+    // user click on the "Show suggestions for my area" CTA.
     let suggestionSeed = 0;
-    paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
-
     const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    const showBtn = sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-show');
+    const noLocEl = sugRoot?.querySelector<HTMLElement>('.hw-suggestions-no-location');
+    const loadingEl = sugRoot?.querySelector<HTMLElement>('.hw-suggestions-loading');
+
+    sugRoot?.classList.remove('hidden');
+
+    const cachedLoc = getCachedSuggestionsLoc();
+    if (cachedLoc) {
+      showBtn?.classList.add('hidden');
+      paintSuggestions(root, lang, user.id, suggestionSeed, cachedLoc).catch(() => {/* optional */});
+    } else {
+      showBtn?.addEventListener('click', () => {
+        if (showBtn.disabled) return;
+        showBtn.disabled = true;
+        showBtn.classList.add('hidden');
+        noLocEl?.classList.add('hidden');
+        loadingEl?.classList.remove('hidden');
+        requestSuggestionsLocation()
+          .then(loc => paintSuggestions(root, lang, user.id, suggestionSeed, loc))
+          .catch(() => {
+            loadingEl?.classList.add('hidden');
+            noLocEl?.classList.remove('hidden');
+          });
+      });
+    }
+
     sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-refresh')?.addEventListener('click', () => {
       suggestionSeed = (suggestionSeed + 1) % 100;
       try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
-      paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
+      const loc = getCachedSuggestionsLoc();
+      if (!loc) return;
+      paintSuggestions(root, lang, user.id, suggestionSeed, loc).catch(() => {/* optional */});
     });
   }
 

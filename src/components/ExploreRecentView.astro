@@ -71,6 +71,7 @@ const distancePage = page as unknown as Record<string, string>;
   data-label-distance-km={distancePage.distance_filter_km ?? '{{km}} km'}
   data-label-distance-no-location={distancePage.distance_filter_no_location ?? 'Enable location to filter by distance'}
   data-label-distance-locating={distancePage.distance_filter_locating ?? 'Getting your location…'}
+  data-label-distance-show={distancePage.distance_filter_show ?? 'Show observations near me'}
 >
   <header class="space-y-3 py-6">
     <div class="flex items-start justify-between gap-3">
@@ -137,17 +138,23 @@ const distancePage = page as unknown as Record<string, string>;
       </div>
     </div>
 
-    <!-- #712 Distance filter — fires after geolocation; non-blocking -->
+    <!-- #712 Distance filter — PBI 1.3: deferred behind explicit user action. -->
     <div
-      class="er-distance-filter hidden items-center gap-2 flex-wrap"
+      class="er-distance-filter flex items-center gap-2 flex-wrap"
       role="group"
       aria-label={distancePage.distance_filter_label ?? 'Filter by distance'}
     >
       <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0">
         {distancePage.distance_filter_label ?? 'Filter by distance'}:
       </span>
-      <!-- Buttons are injected by the client script after geolocation resolves -->
-      <p class="er-distance-locating text-xs text-zinc-400 dark:text-zinc-500">
+      <button
+        type="button"
+        class="er-distance-show inline-flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+      >
+        <span aria-hidden="true">📍</span>
+        <span>{distancePage.distance_filter_show ?? 'Show observations near me'}</span>
+      </button>
+      <p class="er-distance-locating hidden text-xs text-zinc-400 dark:text-zinc-500">
         {distancePage.distance_filter_locating ?? 'Getting your location…'}
       </p>
       <p class="er-distance-no-loc hidden text-xs text-zinc-400 dark:text-zinc-500">
@@ -518,41 +525,22 @@ const distancePage = page as unknown as Record<string, string>;
     }
 
     /**
-     * Initialise the distance filter UI. Fires after geolocation resolves.
-     * Non-blocking — called from init() with .catch(() => {}).
+     * Wire the distance filter UI after a location is known.
+     * PBI 1.3: never calls `getCurrentPosition` itself — the caller
+     * provides coords either from cache or from an explicit user click.
      */
-    async function initDistanceFilter(): Promise<void> {
-      const filterWrap = root.querySelector<HTMLElement>('.er-distance-filter');
+    function renderDistanceButtons(lat: number, lng: number): void {
       const locatingEl = root.querySelector<HTMLElement>('.er-distance-locating');
       const noLocEl = root.querySelector<HTMLElement>('.er-distance-no-loc');
+      const showBtn = root.querySelector<HTMLButtonElement>('.er-distance-show');
       const btnsEl = root.querySelector<HTMLElement>('.er-distance-btns');
-      if (!filterWrap || !btnsEl) return;
+      if (!btnsEl) return;
 
-      filterWrap.classList.remove('hidden');
-      filterWrap.classList.add('flex');
-
-      // Try cached location first.
-      let lat: number, lng: number;
-      const cached = getCachedLoc();
-      if (cached) {
-        lat = cached.lat; lng = cached.lng;
-      } else {
-        try {
-          const pos = await new Promise<GeolocationPosition>((res, rej) =>
-            navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000, maximumAge: LOCATION_TTL_MS }),
-          );
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-          setCachedLoc(lat, lng);
-        } catch {
-          locatingEl?.classList.add('hidden');
-          noLocEl?.classList.remove('hidden');
-          return;
-        }
-      }
       userLat = lat; userLng = lng;
 
+      showBtn?.classList.add('hidden');
       locatingEl?.classList.add('hidden');
+      noLocEl?.classList.add('hidden');
       btnsEl.classList.remove('hidden');
       btnsEl.classList.add('flex');
 
@@ -1065,8 +1053,38 @@ const distancePage = page as unknown as Record<string, string>;
       loadMore().catch(() => { /* surfaced via errEl */ });
     });
 
-    // #712 — Start distance filter setup non-blocking after main content loads
-    initDistanceFilter().catch(() => { /* geolocation denied or unavailable */ });
+    // #712 / PBI 1.3 — Distance filter is wired here but geolocation is
+    // ONLY requested behind an explicit click on the "Show observations
+    // near me" CTA. A cached location from a prior visit (sessionStorage,
+    // 5-min TTL) is honoured without prompting.
+    const distanceShowBtn = root.querySelector<HTMLButtonElement>('.er-distance-show');
+    const distanceLocatingEl = root.querySelector<HTMLElement>('.er-distance-locating');
+    const distanceNoLocEl = root.querySelector<HTMLElement>('.er-distance-no-loc');
+    const cachedDistanceLoc = getCachedLoc();
+    if (cachedDistanceLoc) {
+      renderDistanceButtons(cachedDistanceLoc.lat, cachedDistanceLoc.lng);
+    } else {
+      distanceShowBtn?.addEventListener('click', () => {
+        if (distanceShowBtn.disabled) return;
+        distanceShowBtn.disabled = true;
+        distanceShowBtn.classList.add('hidden');
+        distanceNoLocEl?.classList.add('hidden');
+        distanceLocatingEl?.classList.remove('hidden');
+        new Promise<GeolocationPosition>((res, rej) =>
+          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000, maximumAge: LOCATION_TTL_MS }),
+        )
+          .then((pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            setCachedLoc(lat, lng);
+            renderDistanceButtons(lat, lng);
+          })
+          .catch(() => {
+            distanceLocatingEl?.classList.add('hidden');
+            distanceNoLocEl?.classList.remove('hidden');
+          });
+      });
+    }
 
     await loadMore();
   }
