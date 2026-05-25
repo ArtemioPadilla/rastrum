@@ -1,10 +1,16 @@
 ---
 /**
- * ConsentBanner.astro — LFPDPPP / LGPD analytics consent gate (#781)
+ * ConsentBanner.astro — LFPDPPP / LGPD analytics consent gate (#781).
  *
  * Shown on first visit (no 'rastrum_analytics_consent' key in localStorage).
  * Hidden when DNT is set (no analytics fire regardless of this banner).
  * Stores 'rastrum_analytics_consent' = 'true' | 'false' in localStorage.
+ *
+ * Layout (PBI 1.1, UI/UX audit): default state is a slim bottom-sheet
+ * (≤ 80 px tall) so the primary CTA above-the-fold stays visible. Past
+ * scrollY > 200 the banner collapses to a 36 px floating pill in the
+ * bottom-right corner; clicking the pill re-expands it. Respects
+ * prefers-reduced-motion.
  *
  * After accepting, PostHog is initialised by dispatching a custom event
  * ('rastrum:consent-updated') that posthog.astro listens for via
@@ -21,46 +27,95 @@ const { lang = 'en' } = Astro.props;
 const tr = lang === 'es' ? esStrings.consent : enStrings.consent;
 ---
 
-<!-- Consent banner: hidden by default; shown by JS when consent is unknown -->
 <div
   id="rastrum-consent-banner"
-  role="dialog"
+  role="region"
   aria-live="polite"
   aria-label={lang === 'es' ? 'Banner de consentimiento de analíticas' : 'Analytics consent banner'}
-  class="fixed bottom-0 left-0 right-0 z-[9000] hidden"
+  data-collapsed="false"
+  class="rastrum-consent fixed z-[9000] hidden"
 >
-  <div class="mx-auto max-w-2xl mb-4 mx-4 sm:mx-auto px-5 py-4 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-    <p class="text-sm text-zinc-700 dark:text-zinc-300 flex-1">
+  <div
+    class="rastrum-consent-sheet mx-auto max-w-3xl px-4 py-2 sm:py-3 rounded-t-xl shadow-xl border border-b-0 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-row items-center gap-3"
+  >
+    <p class="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 flex-1 leading-tight">
       {tr.banner_text}
     </p>
     <div class="flex gap-2 shrink-0">
       <button
         id="rastrum-consent-decline"
-        class="rounded-lg px-3 py-1.5 text-sm font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        class="rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
         {tr.decline}
       </button>
       <button
         id="rastrum-consent-accept"
-        class="rounded-lg px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+        class="rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
       >
         {tr.accept}
       </button>
     </div>
   </div>
+
+  <button
+    id="rastrum-consent-toast"
+    type="button"
+    class="rastrum-consent-toast hidden rounded-full px-3 py-1 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 shadow-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+    aria-label={tr.toast_label}
+  >
+    <span aria-hidden="true">🍪</span> {tr.toast_label}
+  </button>
 </div>
+
+<style>
+  .rastrum-consent[data-collapsed='false'] {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 80px;
+  }
+  .rastrum-consent[data-collapsed='false'] .rastrum-consent-sheet {
+    display: flex;
+  }
+  .rastrum-consent[data-collapsed='false'] .rastrum-consent-toast {
+    display: none;
+  }
+  .rastrum-consent[data-collapsed='true'] {
+    bottom: 1rem;
+    right: 1rem;
+    left: auto;
+  }
+  .rastrum-consent[data-collapsed='true'] .rastrum-consent-sheet {
+    display: none;
+  }
+  .rastrum-consent[data-collapsed='true'] .rastrum-consent-toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-height: 36px;
+  }
+  .rastrum-consent-sheet,
+  .rastrum-consent-toast {
+    transition: opacity 200ms ease, transform 200ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rastrum-consent-sheet,
+    .rastrum-consent-toast {
+      transition: none;
+    }
+  }
+</style>
 
 <script is:inline>
   (function () {
     const CONSENT_KEY = 'rastrum_analytics_consent';
+    const SCROLL_THRESHOLD = 200;
     const banner = document.getElementById('rastrum-consent-banner');
     if (!banner) return;
 
-    // Never show when DNT is active.
     const dnt = navigator.doNotTrack === '1' || window.doNotTrack === '1';
     if (dnt) return;
 
-    // Show only if no decision has been stored yet.
     const stored = localStorage.getItem(CONSENT_KEY);
     if (stored !== null) return;
 
@@ -69,13 +124,27 @@ const tr = lang === 'es' ? esStrings.consent : enStrings.consent;
     function dismiss(accepted) {
       localStorage.setItem(CONSENT_KEY, accepted ? 'true' : 'false');
       banner.classList.add('hidden');
-      // Notify other scripts (e.g. a reload-free PostHog init could listen here).
+      window.removeEventListener('scroll', onScroll);
       window.dispatchEvent(new CustomEvent('rastrum:consent-updated', { detail: { accepted } }));
+    }
+
+    function setCollapsed(collapsed) {
+      banner.setAttribute('data-collapsed', collapsed ? 'true' : 'false');
+    }
+
+    function onScroll() {
+      if (window.scrollY > SCROLL_THRESHOLD) {
+        if (banner.getAttribute('data-collapsed') !== 'true') setCollapsed(true);
+      }
     }
 
     document.getElementById('rastrum-consent-accept')
       ?.addEventListener('click', () => dismiss(true));
     document.getElementById('rastrum-consent-decline')
       ?.addEventListener('click', () => dismiss(false));
+    document.getElementById('rastrum-consent-toast')
+      ?.addEventListener('click', () => setCollapsed(false));
+
+    window.addEventListener('scroll', onScroll, { passive: true });
   })();
 </script>
