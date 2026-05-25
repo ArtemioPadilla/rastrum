@@ -232,7 +232,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
 
 <script>
-  import maplibregl from 'maplibre-gl';
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
   import { parseChips, parseSort, buildSpeciesUrl, type ChipsState, type SortMode } from '../lib/species-filters';
@@ -1489,6 +1488,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           noCoordsEl.classList.add('rounded-lg', 'border', 'border-zinc-200', 'dark:border-zinc-800', 'p-8');
         }
       } else {
+        const maplibregl = (await import('maplibre-gl')).default;
         const REMOTE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
         const map = new maplibregl.Map({
           container: mapEl,
