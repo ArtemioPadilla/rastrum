@@ -86,7 +86,7 @@ const distancePage = page as unknown as Record<string, string>;
       >
         <button
           type="button"
-          class="er-view-btn er-view-cards inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
+          class="er-view-btn er-view-cards inline-flex h-11 w-11 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
           data-mode="cards"
           aria-label={view.cards}
           aria-pressed="true"
@@ -96,7 +96,7 @@ const distancePage = page as unknown as Record<string, string>;
         </button>
         <button
           type="button"
-          class="er-view-btn er-view-grid inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
+          class="er-view-btn er-view-grid inline-flex h-11 w-11 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
           data-mode="grid"
           aria-label={view.grid}
           aria-pressed="false"
@@ -106,7 +106,7 @@ const distancePage = page as unknown as Record<string, string>;
         </button>
         <button
           type="button"
-          class="er-view-btn er-view-list inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
+          class="er-view-btn er-view-list inline-flex h-11 w-11 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
           data-mode="list"
           aria-label={(view as unknown as Record<string, string>).list_aria ?? 'List view'}
           aria-pressed="false"
@@ -116,7 +116,7 @@ const distancePage = page as unknown as Record<string, string>;
         </button>
         <button
           type="button"
-          class="er-view-btn er-view-map inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
+          class="er-view-btn er-view-map inline-flex h-11 w-11 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
           data-mode="map"
           aria-label={(view as unknown as Record<string, string>).map_aria ?? 'Map view'}
           aria-pressed="false"
@@ -126,7 +126,7 @@ const distancePage = page as unknown as Record<string, string>;
         </button>
         <button
           type="button"
-          class="er-view-btn er-view-timeline inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
+          class="er-view-btn er-view-timeline inline-flex h-11 w-11 items-center justify-center rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-pressed:bg-emerald-100 dark:aria-pressed:bg-emerald-900/40 aria-pressed:text-emerald-800 dark:aria-pressed:text-emerald-300"
           data-mode="timeline"
           aria-label={(view as unknown as Record<string, string>).timeline_aria ?? 'Timeline view'}
           aria-pressed="false"
@@ -341,7 +341,7 @@ const distancePage = page as unknown as Record<string, string>;
       : '';
 
     const observerHtml = isPublic && observerUsername
-      ? `${avatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 hover:underline" data-stop>${escapeText(observerName || observerUsername)}</a>`
+      ? `${avatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 underline decoration-emerald-300 dark:decoration-emerald-700 underline-offset-2 hover:decoration-emerald-500" data-stop>${escapeText(observerName || observerUsername)}</a>`
       : `<span class="text-zinc-500">${escapeText(anonLabel)}</span>`;
 
     const confidencePill = confidence !== null
@@ -360,7 +360,7 @@ const distancePage = page as unknown as Record<string, string>;
       ? `<div class="er-overflow absolute right-2 top-2 z-10" data-observer-id="${escapeText(r.observer_id)}" data-observer-handle="${escapeText(observer?.username ?? '')}" data-obs-id="${escapeText(r.id)}" data-obs-label="${escapeText(sci)}">
           <button
             type="button"
-            class="er-overflow-trigger inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-zinc-800 hover:bg-white dark:hover:bg-zinc-900 shadow-sm transition-colors"
+            class="er-overflow-trigger inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-zinc-800 hover:bg-white dark:hover:bg-zinc-900 shadow-sm transition-colors"
             aria-label="${escapeText(labels.moreActions)}"
             aria-haspopup="menu"
             aria-expanded="false"
@@ -368,11 +368,11 @@ const distancePage = page as unknown as Record<string, string>;
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
           </button>
           <div class="er-overflow-menu hidden absolute right-0 top-10 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden" role="menu">
-            <button type="button" class="er-action-block flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockObserverAria)}">
+            <button type="button" class="er-action-block flex w-full min-h-[44px] items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockObserverAria)}">
               <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <span>${escapeText(labels.block)}</span>
             </button>
-            <button type="button" class="er-action-report flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportAria)}">
+            <button type="button" class="er-action-report flex w-full min-h-[44px] items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportAria)}">
               <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
               <span>${escapeText(labels.report)}</span>
             </button>
@@ -393,7 +393,7 @@ const distancePage = page as unknown as Record<string, string>;
 
     // --- Fave chip — now an interactive toggle button ---
     // Populated (count + pressed state) after batched fetch in paintReactionCounts.
-    const faveChipHtml = `<button type="button" class="er-fave-chip hidden inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors disabled:opacity-50" data-fave-target="${escapeText(r.id)}" aria-label="Favorite" aria-pressed="false"><svg class="er-fave-icon w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="er-fave-count tabular-nums">0</span></button>`;
+    const faveChipHtml = `<button type="button" class="er-fave-chip hidden inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-3 py-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors disabled:opacity-50" data-fave-target="${escapeText(r.id)}" aria-label="Favorite" aria-pressed="false"><svg class="er-fave-icon w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="er-fave-count tabular-nums">0</span></button>`;
 
     return `<li class="relative">
       ${overflowHtml}
@@ -565,7 +565,7 @@ const distancePage = page as unknown as Record<string, string>;
         const active = km === null && distanceFilterKm === null;
         return `<button
           type="button"
-          class="er-dist-btn inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition-colors
+          class="er-dist-btn inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border px-4 text-xs font-medium transition-colors
             ${active
               ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
               : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:border-emerald-400'
@@ -643,7 +643,7 @@ const distancePage = page as unknown as Record<string, string>;
         ? `<span class="inline-flex h-6 w-6 shrink-0 rounded-full items-center justify-center overflow-hidden bg-emerald-100 dark:bg-emerald-950 ${listRingClass} ring-offset-1 ring-offset-white dark:ring-offset-zinc-900">${listAvatarUrl ? `<img src="${escapeText(listAvatarUrl)}" alt="" class="w-full h-full object-cover" loading="lazy" />` : `<span class="text-[9px] font-bold text-emerald-700 dark:text-emerald-300">${escapeText(listInitials)}</span>`}</span>`
         : '';
       const observerHtml = isPublic && observerUsername
-        ? `${listAvatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 hover:underline">${escapeText(observerName || observerUsername)}</a>`
+        ? `${listAvatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 underline decoration-emerald-300 dark:decoration-emerald-700 underline-offset-2 hover:decoration-emerald-500">${escapeText(observerName || observerUsername)}</a>`
         : `<span class="text-zinc-500">${escapeText(anonLabel)}</span>`;
       // Media type badge for list thumbnail
       const mediaBadge = hasAudioOnly

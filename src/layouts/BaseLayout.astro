@@ -197,6 +197,14 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
         line-height: 1;
         display: inline-block;
       }
+      /* PBI 3.3 — WCAG target-size (44x44) for MapLibre native controls
+         (zoom in/out, geolocate, attribution toggle). MapLibre renders these
+         button.maplibregl-ctrl-* inside .maplibregl-ctrl divs at ~29px by
+         default which fails Lighthouse target-size on mobile. */
+      .maplibregl-ctrl button {
+        min-width: 44px !important;
+        min-height: 44px !important;
+      }
     </style>
     <script is:inline>
       (function() {

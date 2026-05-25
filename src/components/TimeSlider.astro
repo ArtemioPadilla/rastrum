@@ -65,7 +65,7 @@ const showingAll = slider.showing_all ?? 'Showing all months';
   >
     <button
       type="button"
-      class="ts-btn snap-start shrink-0 inline-flex min-h-[40px] items-center rounded-full border border-zinc-300 dark:border-zinc-700 px-4 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"
+      class="ts-btn snap-start shrink-0 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"
       data-month="all"
       data-active="true"
       role="radio"
@@ -76,7 +76,7 @@ const showingAll = slider.showing_all ?? 'Showing all months';
     {months.map((label, i) => (
       <button
         type="button"
-        class="ts-btn snap-start shrink-0 inline-flex min-h-[40px] items-center rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"
+        class="ts-btn snap-start shrink-0 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"
         data-month={String(i)}
         data-active="false"
         role="radio"
