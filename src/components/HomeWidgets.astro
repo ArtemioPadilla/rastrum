@@ -21,6 +21,13 @@ const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en
 const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 ---
 
+<!-- HomeChips lives OUTSIDE the .home-widgets section because it self-gates:
+     the signed-in chip nav stays hidden by default and is revealed by
+     getCachedUser(); the anon CTA replaces it. Putting it inside the
+     section would keep the anon CTA hidden for visitors (the parent
+     section starts .hidden and is only unhidden after auth resolution). -->
+<HomeChips lang={lang} />
+
 <section
   class="home-widgets hidden mb-8 space-y-6"
   data-lang={lang}
@@ -74,7 +81,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   </div>
 
   <HomeHero lang={lang} />
-  <HomeChips lang={lang} />
 
   <!-- #710 Daily Challenge -->
   <div class="home-widgets-challenge hidden">

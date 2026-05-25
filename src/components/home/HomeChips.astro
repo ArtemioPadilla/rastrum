@@ -8,14 +8,28 @@ const inboxHref = lang === 'es' ? '/es/bandeja/' : '/en/inbox/';
 const validateHref = lang === 'es' ? '/es/consola/validacion/' : '/en/console/validation/';
 const faltaDexHref = lang === 'es' ? '/es/perfil/dex/' : '/en/profile/dex/';
 const watchlistHref = lang === 'es' ? '/es/explorar/seguimiento/' : '/en/explore/watchlist/';
+const signInHref = lang === 'es' ? '/es/ingresar/' : '/en/sign-in/';
 ---
 
-<nav class="hc-root grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6" data-lang={lang} aria-label="Home actions">
+<!-- Signed-in: personalized shortcut chips. Starts hidden; the auth-aware
+     script below reveals this nav only when getCachedUser() resolves to a
+     user. The four destinations all require a session and would land the
+     visitor on a sign-in wall, so we never paint them for anon. -->
+<nav class="hc-root hidden grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6" data-lang={lang} aria-label="Home actions">
   <a class="hc-tile" href={inboxHref} data-key="inbox"><span class="hc-icon" aria-hidden="true">📬</span><span class="hc-label">{c.inbox}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
   <a class="hc-tile" href={validateHref} data-key="validate"><span class="hc-icon" aria-hidden="true">🔍</span><span class="hc-label">{c.validate}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
   <a class="hc-tile" href={faltaDexHref} data-key="falta_dex"><span class="hc-icon" aria-hidden="true">📊</span><span class="hc-label">{c.falta_dex}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
   <a class="hc-tile" href={watchlistHref} data-key="watchlist"><span class="hc-icon" aria-hidden="true">👀</span><span class="hc-label">{c.watchlist}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
 </nav>
+
+<!-- Anon: discreet single-line CTA. Visible by default so it paints on the
+     first frame (no auth round-trip needed). The script hides it once an
+     authenticated session is detected. -->
+<p class="hc-anon-cta mb-6 text-sm text-zinc-600 dark:text-zinc-400">
+  <a href={signInHref} class="font-medium text-emerald-700 dark:text-emerald-400 hover:underline">
+    {c.anon_cta.text} <span aria-hidden="true">→</span>
+  </a>
+</p>
 
 <style>
   .hc-tile { display:flex; align-items:center; gap:.5rem; padding:.6rem .75rem; border:1px solid rgb(228 228 231); border-radius:.75rem; font-size:.875rem; transition:border-color .15s; }
@@ -25,14 +39,27 @@ const watchlistHref = lang === 'es' ? '/es/explorar/seguimiento/' : '/en/explore
 </style>
 
 <script>
-  import { getSupabase, getCachedUser } from '../../lib/supabase';
+  import { getSupabase, getCachedUser, onAuthChange } from '../../lib/supabase';
   import { loadInboxCount, loadValidateCount, loadFaltaDexCount } from '../../lib/home-loaders';
 
-  async function init() {
+  async function paint() {
     const root = document.querySelector<HTMLElement>('.hc-root');
+    const anonCta = document.querySelector<HTMLElement>('.hc-anon-cta');
     if (!root) return;
+
     const user = await getCachedUser();
-    if (!user) return;
+    if (!user) {
+      // Anon: keep chips hidden, keep the CTA visible. Idempotent so an
+      // auth-change → signed-out flip restores the anon view cleanly.
+      root.classList.add('hidden');
+      anonCta?.classList.remove('hidden');
+      return;
+    }
+
+    // Signed-in: reveal chips, hide the CTA.
+    anonCta?.classList.add('hidden');
+    root.classList.remove('hidden');
+
     let c; try { c = getSupabase(); } catch { return; }
 
     const [inbox, validate, falta] = await Promise.all([
@@ -55,5 +82,8 @@ const watchlistHref = lang === 'es' ? '/es/explorar/seguimiento/' : '/en/explore
     // remains as a navigation affordance.
   }
 
-  init().catch(() => {});
+  paint().catch(() => {});
+  try {
+    onAuthChange(() => { paint().catch(() => {}); });
+  } catch { /* env not set */ }
 </script>
