@@ -15,13 +15,65 @@
  *
  * Mounted globally in BaseLayout.astro.
  */
-import { t, type Locale } from '../i18n/utils';
+import { t, type Locale, getLocalizedString, getPartialLocaleMeta, partialLocaleCodes } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
 }
 const { lang } = Astro.props;
 const tr = t(lang);
+
+// ── Indigenous-language overlay payload (proof of concept) ────────────
+// We ship a per-partial-locale step bundle alongside the default EN/ES one
+// and let the client switch on `localStorage.rastrum.tour.locale`. The
+// selector renders only when a non-fallback overlay is registered.
+const indigenousOverlays = partialLocaleCodes.map(code => {
+  const meta = getPartialLocaleMeta(code);
+  return {
+    code,
+    meta,
+    labels: {
+      skip: getLocalizedString('onboarding.skip', code),
+      next: getLocalizedString('onboarding.next', code),
+      done: getLocalizedString('onboarding.done', code),
+      back: getLocalizedString('onboarding.back', code),
+      start: getLocalizedString('onboarding.start', code),
+      step_label: getLocalizedString('onboarding.step_label', code),
+      step_dot_aria: getLocalizedString('onboarding.step_dot_aria', code),
+      close_label: getLocalizedString('onboarding.close_label', code),
+    },
+    steps: {
+      welcome: {
+        title: getLocalizedString('onboarding.steps.welcome.title', code),
+        body:  getLocalizedString('onboarding.steps.welcome.body',  code),
+      },
+      fab: {
+        title: getLocalizedString('onboarding.steps.fab.title', code),
+        body:  getLocalizedString('onboarding.steps.fab.body',  code),
+      },
+      quick_id: {
+        title: getLocalizedString('onboarding.steps.quick_id.title', code),
+        body:  getLocalizedString('onboarding.steps.quick_id.body',  code),
+      },
+      first_observation_demo: {
+        title: getLocalizedString('onboarding.steps.first_observation_demo.title', code),
+        body:  getLocalizedString('onboarding.steps.first_observation_demo.body',  code),
+      },
+      explore: {
+        title: getLocalizedString('onboarding.steps.explore.title', code),
+        body:  getLocalizedString('onboarding.steps.explore.body',  code),
+      },
+      privacy: {
+        title: getLocalizedString('onboarding.steps.privacy.title', code),
+        body:  getLocalizedString('onboarding.steps.privacy.body',  code),
+      },
+      settings: {
+        title: getLocalizedString('onboarding.steps.settings.title', code),
+        body:  getLocalizedString('onboarding.steps.settings.body',  code),
+      },
+    },
+  };
+});
 type OnbTree = {
   skip: string; next: string; done: string; back: string; start: string;
   step_label: string; step_dot_aria: string; close_label: string;
@@ -126,6 +178,40 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     <h2 id="onb-tooltip-title" class="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2"></h2>
     <p id="onb-tooltip-body" class="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed"></p>
 
+    <!-- Indigenous-language toggle (proof of concept) -->
+    {indigenousOverlays.length > 0 && (
+      <div
+        id="onb-locale-toggle"
+        class="mt-4 flex items-center gap-1.5 text-[10px] uppercase tracking-wider"
+        role="group"
+        aria-label="Tour language"
+      >
+        <span class="text-zinc-400 dark:text-zinc-500" aria-hidden="true">🌐</span>
+        <button
+          type="button"
+          data-tour-locale="es"
+          class="px-1.5 py-1 rounded font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+        >ES</button>
+        <span class="text-zinc-300 dark:text-zinc-700" aria-hidden="true">|</span>
+        <button
+          type="button"
+          data-tour-locale="en"
+          class="px-1.5 py-1 rounded font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+        >EN</button>
+        {indigenousOverlays.map(o => (
+          <>
+            <span class="text-zinc-300 dark:text-zinc-700" aria-hidden="true">|</span>
+            <button
+              type="button"
+              data-tour-locale={o.code}
+              title={`${o.meta?.name_es ?? o.code} — ${o.meta?.review_status ?? ''}`}
+              class="px-1.5 py-1 rounded font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >{o.meta?.name_native ?? o.code.toUpperCase()}</button>
+          </>
+        ))}
+      </div>
+    )}
+
     <!-- Navigation footer -->
     <div class="mt-5 flex items-center justify-between gap-2">
       <button
@@ -210,6 +296,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   ])}
 />
 
+<!-- Indigenous-language overlay payload — consumed by the client script below -->
+<script
+  id="onb-locale-overlays"
+  type="application/json"
+  set:html={JSON.stringify(indigenousOverlays)}
+/>
+
 <script>
   import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { resolveFirstVisible } from '../lib/onboarding-target';
@@ -251,7 +344,68 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   const rawSteps = document.getElementById('onb-step-data');
   let STEPS: StepDef[] = [];
   try { STEPS = JSON.parse(rawSteps?.textContent ?? '[]') as StepDef[]; } catch { /* noop */ }
+  const DEFAULT_STEPS: StepDef[] = STEPS.slice();
   const TOTAL = STEPS.length;
+
+  // ── Indigenous-language overlay swap (proof of concept) ─────────────
+  type OverlayBundle = {
+    code: string;
+    labels: { skip: string; next: string; done: string; back: string; start: string; step_label: string; step_dot_aria: string; close_label: string };
+    steps: Record<string, { title: string; body: string }>;
+  };
+  const TOUR_LOCALE_KEY = 'rastrum.tour.locale';
+  const rawOverlays = document.getElementById('onb-locale-overlays');
+  let OVERLAYS: OverlayBundle[] = [];
+  try { OVERLAYS = JSON.parse(rawOverlays?.textContent ?? '[]') as OverlayBundle[]; } catch { /* noop */ }
+  let labelSkipEff = '';
+  let labelNextEff = '';
+  let labelDoneEff = '';
+  let labelBackEff = '';
+  let labelStartEff = '';
+  let stepTplEff = '';
+  let dotAriaTplEff = '';
+
+  // Map step index → overlay-bundle step key (mirrors stepsData order in the
+  // JSON payload above). Keep in sync if you reorder STEPS.
+  const STEP_KEYS = ['welcome', 'fab', 'quick_id', 'first_observation_demo', 'explore', 'privacy', 'settings'] as const;
+
+  function applyLocaleSwap(loc: string): void {
+    const overlay = OVERLAYS.find(o => o.code === loc);
+    if (!overlay) {
+      STEPS = DEFAULT_STEPS.slice();
+      labelSkipEff = labelSkip; labelNextEff = labelNext; labelDoneEff = labelDone;
+      labelBackEff = labelBack; labelStartEff = labelStart;
+      stepTplEff = stepTpl; dotAriaTplEff = dotAriaTpl;
+    } else {
+      STEPS = DEFAULT_STEPS.map((s, i) => {
+        const key = STEP_KEYS[i];
+        const tr = key ? overlay.steps[key] : undefined;
+        return tr ? { ...s, title: tr.title, body: tr.body } : s;
+      });
+      labelSkipEff = overlay.labels.skip || labelSkip;
+      labelNextEff = overlay.labels.next || labelNext;
+      labelDoneEff = overlay.labels.done || labelDone;
+      labelBackEff = overlay.labels.back || labelBack;
+      labelStartEff = overlay.labels.start || labelStart;
+      stepTplEff = overlay.labels.step_label || stepTpl;
+      dotAriaTplEff = overlay.labels.step_dot_aria || dotAriaTpl;
+    }
+    dots.forEach((d, i) => d.setAttribute('aria-label', dotAriaTplEff.replace('{n}', String(i + 1))));
+  }
+
+  let storedLocale = '';
+  try { storedLocale = localStorage.getItem(TOUR_LOCALE_KEY) ?? ''; } catch { /* noop */ }
+  applyLocaleSwap(storedLocale);
+
+  document.querySelectorAll<HTMLButtonElement>('[data-tour-locale]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const loc = btn.dataset.tourLocale ?? '';
+      try { localStorage.setItem(TOUR_LOCALE_KEY, loc); } catch { /* noop */ }
+      applyLocaleSwap(loc);
+      render();
+      try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: 'locale_change', locale: loc } })); } catch { /* noop */ }
+    });
+  });
 
   let current = 0;
   let returnFocusEl: HTMLElement | null = null;
@@ -529,7 +683,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     else if (step.kind === 'first_observation_demo') renderFirstObsDemo(presetWrap);
     else clearPresetButtons(presetWrap);
 
-    stepLabelEl.textContent = stepTpl
+    stepLabelEl.textContent = (stepTplEff || stepTpl)
       .replace('{current}', String(current + 1))
       .replace('{total}',   String(TOTAL));
 
@@ -546,12 +700,16 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     const isLast  = current === TOTAL - 1;
     const isFirst = current === 0;
 
-    skipBtn.textContent = isLast ? '' : labelSkip;
+    skipBtn.textContent = isLast ? '' : (labelSkipEff || labelSkip);
     skipBtn.classList.toggle('hidden', isLast);
 
-    nextBtn.textContent = isFirst ? labelStart : isLast ? labelDone : labelNext;
+    nextBtn.textContent = isFirst
+      ? (labelStartEff || labelStart)
+      : isLast
+        ? (labelDoneEff || labelDone)
+        : (labelNextEff || labelNext);
 
-    backBtn.textContent = labelBack;
+    backBtn.textContent = labelBackEff || labelBack;
     backBtn.classList.toggle('hidden',  isFirst);
     backBtn.classList.toggle('inline-flex', !isFirst);
 

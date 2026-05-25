@@ -1,7 +1,49 @@
 import en from './en.json';
 import es from './es.json';
+import zap from './zap.json';
 
 const translations: Record<string, typeof en> = { en, es };
+
+// ---------------------------------------------------------------------------
+// Partial / overlay locales (e.g. indigenous languages).
+//
+// These cover only a subset of the i18n surface (right now: just the
+// OnboardingTour as proof-of-concept for the landing's promise of indigenous
+// language support). Anything not present in the overlay falls back to the
+// declared `fallback_locale` (es for zap).
+//
+// IMPORTANT: This is intentionally NOT added to `translations` above so the
+// strict bilingual contract for components that read `t(lang).foo.bar`
+// continues to work (Astro frontmatter has type guarantees against the
+// full en.json shape). Overlay locales are surfaced only via the runtime
+// helpers below — `getLocalizedString()` and `getPartialLocaleMeta()`.
+// ---------------------------------------------------------------------------
+
+interface PartialLocaleMeta {
+  code: string;
+  name_en: string;
+  name_es: string;
+  name_native: string;
+  iso_639_3: string;
+  variant?: string;
+  coverage: string;
+  fallback_locale: 'en' | 'es';
+  review_status: string;
+  notes?: string;
+}
+
+interface PartialLocale {
+  __locale_meta: PartialLocaleMeta;
+  _review?: { needs_native_speaker_check?: string[] };
+  [key: string]: unknown;
+}
+
+const partialLocales: Record<string, PartialLocale> = {
+  zap: zap as unknown as PartialLocale,
+};
+
+export const partialLocaleCodes = ['zap'] as const;
+export type PartialLocaleCode = (typeof partialLocaleCodes)[number];
 
 export function getLangFromUrl(url: URL) {
   const [, base, lang] = url.pathname.split('/');
@@ -12,6 +54,61 @@ export function getLangFromUrl(url: URL) {
 
 export function t(lang: string) {
   return translations[lang] || translations['en'];
+}
+
+/**
+ * Resolve a single dot-path string with overlay fallback semantics.
+ *
+ * Lookup order for a partial locale (e.g. 'zap'):
+ *   1. The partial locale's own JSON (zap.json).
+ *   2. The partial locale's declared fallback_locale (es).
+ *   3. en.json (final safety net).
+ *
+ * For built-in full locales ('en' | 'es'), this is just a path lookup
+ * with an en.json fallback if the key is missing.
+ *
+ * @example
+ *   getLocalizedString('onboarding.steps.welcome.title', 'zap')
+ *   // → 'Padiuxh Rastrum'
+ *
+ *   getLocalizedString('header.signIn', 'zap')
+ *   // → falls back to es.json
+ */
+export function getLocalizedString(path: string, lang: string): string {
+  const segs = path.split('.');
+  const tryTree = (root: unknown): string | undefined => {
+    let cur: unknown = root;
+    for (const seg of segs) {
+      if (cur && typeof cur === 'object' && seg in (cur as Record<string, unknown>)) {
+        cur = (cur as Record<string, unknown>)[seg];
+      } else {
+        return undefined;
+      }
+    }
+    return typeof cur === 'string' ? cur : undefined;
+  };
+
+  const partial = partialLocales[lang];
+  if (partial) {
+    const hit = tryTree(partial);
+    if (hit !== undefined) return hit;
+    const fallbackLang = partial.__locale_meta.fallback_locale;
+    const fallbackHit = tryTree(translations[fallbackLang]);
+    if (fallbackHit !== undefined) return fallbackHit;
+    return tryTree(translations.en) ?? path;
+  }
+
+  const direct = tryTree(translations[lang]);
+  if (direct !== undefined) return direct;
+  return tryTree(translations.en) ?? path;
+}
+
+/**
+ * Return the partial-locale metadata (or null when `lang` isn't a registered
+ * overlay locale). Consumed by UIs that surface review status / fallback hints.
+ */
+export function getPartialLocaleMeta(lang: string): PartialLocaleMeta | null {
+  return partialLocales[lang]?.__locale_meta ?? null;
 }
 
 export function getLocalizedPath(lang: string, path: string) {
