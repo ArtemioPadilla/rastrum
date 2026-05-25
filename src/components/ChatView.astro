@@ -19,7 +19,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       <h1 class="text-2xl font-bold tracking-tight">{tr.chat.title}</h1>
       <span id="chat-model-badge" class="inline-flex items-center gap-1 rounded-full border border-emerald-300 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/10 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-300">
         <span aria-hidden="true">✨</span>
-        <span id="chat-model-badge-text">{lang === 'es' ? 'En el dispositivo' : 'On-device'}</span>
+        <span id="chat-model-badge-text">{tr.chat.badge.fallback}</span>
       </span>
     </div>
     <button
@@ -181,6 +181,21 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   }
   function writeModelPick(v: ModelPickerChoice): void {
     if (typeof localStorage !== 'undefined') localStorage.setItem(MODEL_PICKER_KEY, v);
+  }
+
+  type ChatEngineChoice = 'gemma' | 'llama';
+  const CHAT_ENGINE_KEY = 'rastrum.chat.engine';
+  const MODEL_DISPLAY_NAMES: Record<ChatEngineChoice, string> = {
+    gemma: 'Gemma 4 E2B',
+    llama: 'Llama 3.2 1B',
+  };
+  function readChatEngine(): ChatEngineChoice | null {
+    if (typeof localStorage === 'undefined') return null;
+    const v = localStorage.getItem(CHAT_ENGINE_KEY);
+    return v === 'gemma' || v === 'llama' ? v : null;
+  }
+  function writeChatEngine(v: ChatEngineChoice): void {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(CHAT_ENGINE_KEY, v);
   }
 
   const isEs = (document.documentElement.lang === 'es');
@@ -508,6 +523,46 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     });
   });
 
+  // ── Chat model badge ──
+  // Reflects the user's chat-engine choice in <localStorage[rastrum.chat.engine]>.
+  // Falls back to a "Choose a model" anchor pointing at the in-page picker.
+  const badgeContainer = document.getElementById('chat-model-badge');
+  const BADGE_SUFFIX   = i18nGet('badge-suffix')   || (isEs ? 'en el dispositivo' : 'on-device');
+  const BADGE_UNSET    = i18nGet('badge-unset')    || (isEs ? 'Elige un modelo'   : 'Choose a model');
+  const BADGE_FALLBACK = i18nGet('badge-fallback') || (isEs ? 'En el dispositivo' : 'On-device');
+  function paintModelBadge(): void {
+    if (!badgeContainer) return;
+    const engine = readChatEngine();
+    if (engine) {
+      const name = MODEL_DISPLAY_NAMES[engine];
+      badgeContainer.innerHTML = `<span aria-hidden="true">✨</span> <span id="chat-model-badge-text">${name} · ${BADGE_SUFFIX}</span>`;
+      badgeContainer.removeAttribute('aria-describedby');
+      return;
+    }
+    const consentVisible = !document.getElementById('chat-consent')?.classList.contains('hidden');
+    if (!consentVisible) {
+      badgeContainer.innerHTML = `<span aria-hidden="true">✨</span> <span id="chat-model-badge-text">${BADGE_FALLBACK}</span>`;
+      badgeContainer.removeAttribute('aria-describedby');
+      return;
+    }
+    badgeContainer.innerHTML = `<span aria-hidden="true">✨</span> <a id="chat-model-badge-text" href="#chat-consent" class="underline decoration-dotted underline-offset-2">${BADGE_UNSET}</a> <span>· ${BADGE_SUFFIX}</span>`;
+    badgeContainer.setAttribute('aria-describedby', 'chat-consent');
+  }
+  paintModelBadge();
+  // Back-compat: a user who downloaded Gemma before this code shipped has
+  // the cache populated but no engine key. Probe once and backfill.
+  if (readChatEngine() === null) {
+    void import('../lib/onnx-vision').then(async (lib) => {
+      try {
+        const status = await lib.getGemmaCacheStatus();
+        if (status.cached) {
+          writeChatEngine('gemma');
+          paintModelBadge();
+        }
+      } catch { /* ignore */ }
+    });
+  }
+
   // ── File pickers ──
   photoBtn?.addEventListener('click', () => photoInput?.click());
   galleryBtn?.addEventListener('click', () => galleryInput?.click());
@@ -750,6 +805,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       await lib.loadTextEngine((p) => {
         if (dlProgress) dlProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
       });
+      writeChatEngine('llama');
+      paintModelBadge();
       modelReady = true;
       consentBox?.classList.add('hidden');
       historyEl?.classList.remove('hidden');
@@ -774,6 +831,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       await lib.loadGemmaTextEngine((p) => {
         if (dlProgress) dlProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
       });
+      writeChatEngine('gemma');
+      paintModelBadge();
       modelReady = true;
       consentBox?.classList.add('hidden');
       historyEl?.classList.remove('hidden');
@@ -1518,29 +1577,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       });
     });
 
-    // Model badge: reflect Gemma vs Llama state when consent is granted.
-    const badgeText = document.getElementById('chat-model-badge-text');
-    function paintModelBadge(): void {
-      if (!badgeText) return;
-      const isReady = !document.getElementById('chat-consent')?.classList.contains('hidden') ? false : true;
-      if (!isReady) {
-        badgeText.textContent = isEs ? 'En el dispositivo' : 'On-device';
-        return;
-      }
-      // Probe which engine got loaded by checking the cache status.
-      void import('../lib/onnx-vision').then(async (lib) => {
-        try {
-          const status = await lib.getGemmaCacheStatus();
-          badgeText.textContent = status.cached
-            ? (isEs ? 'Gemma 4 · en el dispositivo' : 'Gemma 4 · on-device')
-            : (isEs ? 'Llama 1B · en el dispositivo' : 'Llama 1B · on-device');
-        } catch {
-          badgeText.textContent = isEs ? 'En el dispositivo' : 'On-device';
-        }
-      });
-    }
-    paintModelBadge();
-    // Re-paint after a small delay (the consent gate may flip after model load).
+    // Re-paint badge after small delay (consent box may flip after init).
     setTimeout(paintModelBadge, 1500);
   })().catch((e) => {
     console.warn('[chat] entity wiring init failed', e);
