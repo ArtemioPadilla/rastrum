@@ -157,6 +157,31 @@ const heroSub = isEs
 
 const itemsLabel = isEs ? 'ítems' : 'items';
 const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
+
+// PBI 5.3 (#1193) — virtualization. Render the first N items of each phase
+// server-side (gives shape + above-the-fold content without JS); ship the
+// rest as fixed-height placeholders that an IntersectionObserver mounts as
+// they scroll into view. Deep-link anchors (`#item-<id>`) are honoured by
+// the bootstrap script before scroll.
+const EAGER_PER_PHASE = 1;
+
+// Payload for the client-side renderer. Only items that ship as placeholders
+// land here; the SSR-rendered ones don't need to be re-rendered client-side.
+const itemPayload: Record<string, Pick<DisplayItem, 'label' | 'done' | 'blocked' | 'blockedBy'>> = {};
+for (const phase of phases) {
+  for (const item of phase.items.slice(EAGER_PER_PHASE)) {
+    itemPayload[item.id] = {
+      label: item.label,
+      done: item.done,
+      blocked: item.blocked,
+      blockedBy: item.blockedBy,
+    };
+  }
+}
+const payloadJson = JSON.stringify({
+  items: itemPayload,
+  blockedLabel: blockedLabelText,
+});
 ---
 
 <article class="space-y-6">
@@ -183,7 +208,7 @@ const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
   </section>
 
   <!-- Phases -->
-  <div class="space-y-3">
+  <div class="space-y-3" data-roadmap-root>
     {phases.map((phase) => {
       const tone = phaseTone(phase.status);
       const cfg = toneConfig[tone];
@@ -191,6 +216,8 @@ const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
       const total = phase.items.length;
       const pct = total ? Math.round((doneCount / total) * 100) : 0;
       const showStatusString = phase.status.length > 16; // long descriptive statuses
+      const eagerItems = phase.items.slice(0, EAGER_PER_PHASE);
+      const lazyItems = phase.items.slice(EAGER_PER_PHASE);
       return (
         <div class:list={["relative rounded-xl border transition-all", cfg.border, cfg.bg]}>
           <div class="p-5 pb-3">
@@ -231,10 +258,10 @@ const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
           </div>
 
           <div class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1">
-            {phase.items.map(item => {
+            {eagerItems.map(item => {
               const symbol = item.done ? 'check' : item.blocked ? 'block' : 'todo';
               return (
-                <div class="flex items-start gap-2.5">
+                <div id={`item-${item.id}`} class="flex items-start gap-2.5">
                   <div class:list={[
                     "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors",
                     symbol === 'check' ? "bg-emerald-500 border-emerald-500"
@@ -266,6 +293,14 @@ const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
                 </div>
               );
             })}
+            {lazyItems.map(item => (
+              <div
+                id={`item-${item.id}`}
+                data-roadmap-item
+                data-id={item.id}
+                class="min-h-[1.75rem]"
+              ></div>
+            ))}
           </div>
         </div>
       );
@@ -303,4 +338,118 @@ const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
   )}
 
   <p class="text-xs text-zinc-500 dark:text-zinc-600 px-1 pt-2">{helpText}</p>
+
+  <script type="application/json" data-roadmap-data set:html={payloadJson}></script>
+
+  <script>
+    interface LazyItem {
+      label: string;
+      done: boolean;
+      blocked: boolean;
+      blockedBy: string;
+    }
+    interface Payload {
+      items: Record<string, LazyItem>;
+      blockedLabel: string;
+    }
+
+    const dataEl = document.querySelector<HTMLScriptElement>('script[data-roadmap-data]');
+    if (dataEl?.textContent) {
+      const payload = JSON.parse(dataEl.textContent) as Payload;
+
+      function escapeHtml(s: string): string {
+        return s.replace(/[&<>"']/g, ch => (
+          ch === '&' ? '&amp;' :
+          ch === '<' ? '&lt;' :
+          ch === '>' ? '&gt;' :
+          ch === '"' ? '&quot;' : '&#39;'
+        ));
+      }
+
+      function renderItem(host: HTMLElement): void {
+        const id = host.dataset.id;
+        if (!id) return;
+        const data = payload.items[id];
+        if (!data) return;
+        const symbol = data.done ? 'check' : data.blocked ? 'block' : 'todo';
+        const checkboxClass = symbol === 'check'
+          ? 'bg-emerald-500 border-emerald-500'
+          : symbol === 'block'
+            ? 'border-amber-500 bg-amber-500/20'
+            : 'border-zinc-300 dark:border-zinc-700 bg-transparent';
+        const labelClass = data.done
+          ? 'text-zinc-500 dark:text-zinc-500 line-through'
+          : 'text-zinc-700 dark:text-zinc-300';
+        const inner = `
+<div class="mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors ${checkboxClass}">${
+  symbol === 'check'
+    ? '<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/></svg>'
+    : symbol === 'block'
+      ? '<span class="text-[9px] font-bold text-amber-600 dark:text-amber-400">!</span>'
+      : ''
+}</div>
+<div class="min-w-0"><span class="text-sm leading-relaxed ${labelClass}">${escapeHtml(data.label)}</span>${
+  data.blocked
+    ? `<p class="text-[11px] text-amber-600 dark:text-amber-400 italic mt-0.5">${escapeHtml(payload.blockedLabel)}${escapeHtml(data.blockedBy)}</p>`
+    : ''
+}</div>`;
+        host.className = 'flex items-start gap-2.5';
+        host.innerHTML = inner;
+        delete host.dataset.roadmapItem;
+      }
+
+      const placeholders = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-roadmap-item]')
+      );
+
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              renderItem(entry.target as HTMLElement);
+              io.unobserve(entry.target);
+            }
+          }
+        }, { rootMargin: '200px 0px' });
+        for (const el of placeholders) io.observe(el);
+      } else {
+        // No IO support — render everything immediately.
+        for (const el of placeholders) renderItem(el);
+      }
+
+      // Deep-link safety: if location.hash points at a still-unmounted
+      // placeholder, mount it (and a couple of neighbours for context)
+      // before letting the browser scroll. We re-trigger the scroll
+      // because the initial anchor jump fired against an empty shim.
+      function resolveHash(): void {
+        const hash = location.hash;
+        if (!hash) return;
+        // Accept both `#item-<id>` (new canonical anchor) and bare `#<id>`
+        // (existing in-the-wild links from elsewhere in the app).
+        const rawId = hash.slice(1);
+        const target = document.getElementById(rawId)
+          ?? document.getElementById('item-' + rawId);
+        if (!target) return;
+        if (target.hasAttribute('data-roadmap-item')) {
+          renderItem(target);
+          const idx = placeholders.indexOf(target);
+          if (idx !== -1) {
+            for (let offset = -2; offset <= 2; offset++) {
+              const neighbour = placeholders[idx + offset];
+              if (neighbour && neighbour.hasAttribute('data-roadmap-item')) {
+                renderItem(neighbour);
+              }
+            }
+          }
+        }
+        // Re-anchor — initial scroll may have landed on the empty shim.
+        requestAnimationFrame(() => {
+          target.scrollIntoView({ block: 'start' });
+        });
+      }
+
+      resolveHash();
+      window.addEventListener('hashchange', resolveHash);
+    }
+  </script>
 </article>
