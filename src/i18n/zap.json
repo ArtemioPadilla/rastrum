@@ -1,0 +1,68 @@
+{
+  "__locale_meta": {
+    "code": "zap",
+    "name_en": "Zapotec (Valley)",
+    "name_es": "Zapoteco del Valle",
+    "name_native": "Diidxazá",
+    "iso_639_3": "zap",
+    "variant": "Tlacolula / Mitla Valley Zapotec",
+    "coverage": "partial-onboarding-only",
+    "fallback_locale": "es",
+    "review_status": "draft-needs-native-speaker-review",
+    "notes": "Proof-of-concept overlay covering only the OnboardingTour. All other keys fall back to es.json. Some translations carry a // TODO marker in the corresponding _review fields; native-speaker review required before promoting to a full locale. See docs/runbooks/i18n-indigenous-languages.md (TBD)."
+  },
+  "_review": {
+    "needs_native_speaker_check": [
+      "onboarding.start (Sieṉ ríatsoo — composed from 'begin' + 'walk/tour', uncertain idiom)",
+      "onboarding.steps.welcome.body (full-sentence body left as ES fallback)",
+      "onboarding.steps.fab.body (full-sentence body left as ES fallback)",
+      "onboarding.steps.quick_id.* (compound 'identify mode' — phonetic approximation)",
+      "onboarding.steps.explore.body (full-sentence body left as ES fallback)",
+      "onboarding.steps.privacy.* (concept of 'privacy preset' has no direct equivalent — uses 'choose your private')",
+      "onboarding.steps.first_observation_demo.* (technical concept 'cascade' — paraphrased)",
+      "onboarding.step_label / step_dot_aria (numbers untranslated; zap number words exist but unfamiliar to most learners)"
+    ]
+  },
+  "onboarding": {
+    "skip": "Bzaa",
+    "next": "Pieṉ",
+    "done": "Naa nakaa",
+    "back": "Pwen",
+    "step_label": "PIEZHRENA {current} DE {total}",
+    "close_label": "Bgu'a tour",
+    "step_dot_aria": "Piezhrena {n}",
+    "start": "Sieṉ ríatsoo",
+    "replay_tour_label": "Bcaa tour stale",
+    "replay_tour_button": "Bcaa tour",
+    "steps": {
+      "welcome": {
+        "title": "Padiuxh Rastrum",
+        "body": "Rastrum racné lo gananaa ne rcaa stale beṉ' guidxilayú. Tour ricaa 30 segundos — caní bzaalo cualquier hora."
+      },
+      "fab": {
+        "title": "Sieṉ zhanaa",
+        "body": "Bcaa para sieṉ zhanaa — de cualquier lado de la app."
+      },
+      "quick_id": {
+        "title": "Mod gana",
+        "body": "Lo pantalla zhanaa, mismo botón racaa Mod gana — busca por foto con xtipnaa keys o modelo lo dispositivo."
+      },
+      "explore": {
+        "title": "Zhanaa",
+        "body": "Mapa, observación recientes, ne xtipnaa lista — todo lo Zhanaa."
+      },
+      "settings": {
+        "title": "Xtipnaa",
+        "body": "Ajustes, llave IA, notificación, salir — todo detrás xtipnaa avatar."
+      },
+      "privacy": {
+        "title": "Bcholaa to xtipnyaa",
+        "body": "Bcholaa qué tan ribi'a xtipnaa observación lo stub' beṉ'. Caní bcambia cualquier hora."
+      },
+      "first_observation_demo": {
+        "title": "Liia tu nakaa rganalo",
+        "body": "Naqui pasa cuando bcaa xtipnaa primera foto — racié modelo paralelo ne ricaa resultado con má seguridad."
+      }
+    }
+  }
+}
