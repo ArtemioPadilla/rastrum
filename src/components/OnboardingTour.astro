@@ -560,10 +560,22 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     ].join('');
     wrap.appendChild(result);
 
-    // CTA note
-    const cta = document.createElement('p');
-    cta.className = 'mt-2 text-xs text-zinc-500 dark:text-zinc-400 italic';
+    // CTA — anchor that lands on /observe/?onb=demo so the observer
+    // immediately runs the cascade on a pre-loaded photo (guided first
+    // observation). Mark the tour seen before navigating so it doesn't
+    // re-pop on the destination page; the navigation acts as the
+    // step's "completed" outcome.
+    const demoLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+    const demoHref = demoLang === 'es' ? '/observar/?onb=demo' : '/observe/?onb=demo';
+    const cta = document.createElement('a');
+    cta.href = demoHref;
+    cta.className = 'mt-3 inline-flex items-center text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline';
     cta.textContent = labelFirstObsDemoTry;
+    cta.addEventListener('click', () => {
+      markSeen();
+      persistOnboardingDone().catch(() => { /* env not configured */ });
+      try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: 'completed_via_demo', step: current } })); } catch { /* noop */ }
+    });
     container.appendChild(wrap);
     container.appendChild(cta);
   }
