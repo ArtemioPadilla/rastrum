@@ -15,7 +15,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
   <h1 class="text-2xl font-bold tracking-tight mb-2">{tr.map.title}</h1>
   <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
     {tr.map.cross_link.prompt}{' '}
-    <a href={observersMapHref} class="text-emerald-600 dark:text-emerald-400 hover:underline">
+    <a href={observersMapHref} class="text-emerald-600 dark:text-emerald-400 underline decoration-emerald-300 dark:decoration-emerald-700 underline-offset-2 hover:decoration-emerald-500">
       {tr.map.cross_link.cta}
     </a>
   </p>
@@ -26,7 +26,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     <!-- Places layer toggle -->
     <button
       id="places-layer-toggle"
-      class="hidden absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm hover:border-emerald-400 transition-colors"
+      class="hidden absolute top-3 right-3 z-10 flex min-h-[44px] min-w-[44px] items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm hover:border-emerald-400 transition-colors"
       data-active="false"
     >
       <span>🗺️</span>
@@ -467,7 +467,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
           : hasAudio
             ? `<div id="map-media-thumb-${obsId}" data-media-kind="audio" style="width:100%;height:100px;border-radius:6px 6px 0 0;overflow:hidden"></div>`
             : `<div style="width:100%;height:60px;background:${isDark ? '#1e293b' : '#f4f4f5'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:${isDark ? '#64748b' : '#a1a1aa'};font-size:20px">🌿</div>`;
-      const html = `<div style="min-width:180px;max-width:220px;font-family:system-ui;overflow:hidden;border-radius:6px">${mediaHtml}<div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${speciesName}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}<a href="${shareBase}?id=${obsId}" style="display:inline-block;margin-top:6px;font-size:11px;color:#10b981;text-decoration:none;font-weight:500">${isEs ? 'Ver observación →' : 'View observation →'}</a></div></div>`;
+      const html = `<div style="min-width:180px;max-width:220px;font-family:system-ui;overflow:hidden;border-radius:6px">${mediaHtml}<div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${speciesName}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}<a href="${shareBase}?id=${obsId}" style="display:inline-block;margin-top:6px;font-size:11px;color:#10b981;text-decoration:underline;text-underline-offset:2px;font-weight:500">${isEs ? 'Ver observación →' : 'View observation →'}</a></div></div>`;
       const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
         .setLngLat(coords)
         .setHTML(html)
@@ -559,7 +559,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
             if (!props?.slug) return;
             new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
               .setLngLat(e.lngLat)
-              .setHTML(`<div class="text-sm font-medium">${props.name ?? props.slug}</div><div class="text-xs text-zinc-500 mt-0.5">${props.obs_count ?? 0} obs</div><a href="${placeBase}${props.slug}" class="text-xs text-emerald-600 hover:underline mt-1 block">${isEs ? 'Ver lugar →' : 'View place →'}</a>`)
+              .setHTML(`<div class="text-sm font-medium">${props.name ?? props.slug}</div><div class="text-xs text-zinc-500 mt-0.5">${props.obs_count ?? 0} obs</div><a href="${placeBase}${props.slug}" class="text-xs text-emerald-600 underline decoration-emerald-300 underline-offset-2 mt-1 block">${isEs ? 'Ver lugar →' : 'View place →'}</a>`)
               .addTo(map);
           });
           map.on('mouseenter', 'places-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
