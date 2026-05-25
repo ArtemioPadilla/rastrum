@@ -3,6 +3,7 @@ import ConsoleLayout from '../../../components/ConsoleLayout.astro';
 import ConsoleOverviewView from '../../../components/ConsoleOverviewView.astro';
 import ConsoleModOverviewView from '../../../components/ConsoleModOverviewView.astro';
 import ConsoleExpertOverviewView from '../../../components/ConsoleExpertOverviewView.astro';
+import ConsoleAnonView from '../../../components/ConsoleAnonView.astro';
 const lang = 'es';
 ---
 
@@ -13,6 +14,10 @@ const lang = 'es';
        error message if unauthenticated / no-roles. A 1500ms fallback
        un-hides the gate in case JS fails to run at all. -->
   <div id="console-gate" class="hidden p-6 text-sm text-zinc-600 dark:text-zinc-400"></div>
+  <!-- PBI 4.1 — rich anon teaser shown when no session is found. -->
+  <div id="console-anon" class="hidden">
+    <ConsoleAnonView lang={lang} />
+  </div>
   <div id="console-shell-admin" class="hidden">
     <ConsoleOverviewView lang={lang} />
   </div>
@@ -32,6 +37,7 @@ const lang = 'es';
   import { rolePillsFor } from '../../../lib/console-tabs';
 
   const gate = document.getElementById('console-gate')!;
+  const anonBlock = document.getElementById('console-anon')!;
 
   // Fallback: if JS stalls for more than 1500ms, reveal the gate so the
   // user sees something rather than a blank page.
@@ -41,8 +47,8 @@ const lang = 'es';
     const supabase = getSupabase();
     const user = await getCachedUser();
     if (!user) {
-      gate.textContent = 'Se requiere iniciar sesión.';
-      gate.classList.remove('hidden');
+      clearTimeout(fallbackTimer);
+      anonBlock.classList.remove('hidden');
       return;
     }
     const roles = await getUserRoles(user.id);
