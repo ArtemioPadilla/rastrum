@@ -18,7 +18,7 @@ const c = tr.console as unknown as Record<string, string>;
   </div>
 
   <div id="appeals-shell" class="hidden">
-    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{c.mod_appeals_intro}</p>
+    <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{c.mod_appeals_intro}</p>
 
     <div class="flex flex-wrap items-center gap-2 mb-3">
       <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden text-sm">
@@ -34,8 +34,8 @@ const c = tr.console as unknown as Record<string, string>;
     <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-230px)]">
       <!-- Left: appeals list -->
       <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-        <div id="appeals-list-loading" class="p-3 text-sm text-zinc-500 italic">{c.mod_appeals_loading}</div>
-        <div id="appeals-list-empty" class="hidden p-3 text-sm text-zinc-500">{c.mod_appeals_empty}</div>
+        <div id="appeals-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{c.mod_appeals_loading}</div>
+        <div id="appeals-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{c.mod_appeals_empty}</div>
         <ul id="appeals-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
       </aside>
 
@@ -45,16 +45,16 @@ const c = tr.console as unknown as Record<string, string>;
       </div>
       <div id="appeals-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <dt class="text-zinc-500">{c.mod_appeals_col_user}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{c.mod_appeals_col_user}</dt>
           <dd id="appeals-detail-user" class="font-medium text-zinc-800 dark:text-zinc-200 text-xs break-all"></dd>
 
-          <dt class="text-zinc-500">{c.mod_appeals_col_ban_reason}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{c.mod_appeals_col_ban_reason}</dt>
           <dd id="appeals-detail-ban-reason" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{c.mod_appeals_col_status}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{c.mod_appeals_col_status}</dt>
           <dd id="appeals-detail-status" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{c.mod_appeals_col_created}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{c.mod_appeals_col_created}</dt>
           <dd id="appeals-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
         </dl>
 
@@ -170,7 +170,7 @@ const c = tr.console as unknown as Record<string, string>;
     list.innerHTML = rows.map(a => `
       <li class="cursor-pointer px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors ${a.id === selected?.id ? 'bg-zinc-100 dark:bg-zinc-800/60' : ''}" data-appeal-id="${escapeText(a.id)}">
         <div class="flex items-center justify-between gap-2">
-          <span class="text-xs text-zinc-500 truncate">${escapeText(a.appellant_id.slice(0, 8))}…</span>
+          <span class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(a.appellant_id.slice(0, 8))}…</span>
           ${statusPill(a.status)}
         </div>
         <p class="text-xs text-zinc-700 dark:text-zinc-300 truncate mt-0.5">${escapeText(a.message.slice(0, 60))}…</p>

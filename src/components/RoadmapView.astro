@@ -199,11 +199,11 @@ const payloadJson = JSON.stringify({
       <div class="min-w-0 flex-1">
         <p class="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{heroTitle}</p>
         <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-1">{heroSub}</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">{lastUpdatedText}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-2">{lastUpdatedText}</p>
       </div>
     </div>
     {notesLoc && (
-      <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic leading-relaxed">{notesLoc}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-3 italic leading-relaxed">{notesLoc}</p>
     )}
   </section>
 
@@ -230,7 +230,7 @@ const payloadJson = JSON.stringify({
                     <span class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{phase.name}</span>
                     <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", cfg.pillBadge]}>{cfg.pillLabel}</span>
                   </div>
-                  <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">{phase.period}</p>
+                  <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">{phase.period}</p>
                   {showStatusString && phase.statusLong && (
                     <p class="text-[11px] text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">{phase.statusLong}</p>
                   )}
@@ -280,7 +280,7 @@ const payloadJson = JSON.stringify({
                   <div class="min-w-0">
                     <span class:list={[
                       "text-sm leading-relaxed",
-                      item.done ? "text-zinc-500 dark:text-zinc-500 line-through"
+                      item.done ? "text-zinc-600 dark:text-zinc-300 line-through"
                       : item.blocked ? "text-zinc-700 dark:text-zinc-300"
                       : "text-zinc-700 dark:text-zinc-300"
                     ]}>
@@ -329,7 +329,7 @@ const payloadJson = JSON.stringify({
             </div>
             <span class:list={[
               "text-sm leading-relaxed",
-              item.done ? "text-zinc-500 dark:text-zinc-500 line-through" : "text-zinc-700 dark:text-zinc-300"
+              item.done ? "text-zinc-600 dark:text-zinc-300 line-through" : "text-zinc-700 dark:text-zinc-300"
             ]}>{item.label}</span>
           </div>
         ))}
@@ -337,7 +337,7 @@ const payloadJson = JSON.stringify({
     </div>
   )}
 
-  <p class="text-xs text-zinc-500 dark:text-zinc-600 px-1 pt-2">{helpText}</p>
+  <p class="text-xs text-zinc-600 dark:text-zinc-600 px-1 pt-2">{helpText}</p>
 
   <script type="application/json" data-roadmap-data set:html={payloadJson}></script>
 
@@ -378,7 +378,7 @@ const payloadJson = JSON.stringify({
             ? 'border-amber-500 bg-amber-500/20'
             : 'border-zinc-300 dark:border-zinc-700 bg-transparent';
         const labelClass = data.done
-          ? 'text-zinc-500 dark:text-zinc-500 line-through'
+          ? 'text-zinc-600 dark:text-zinc-300 line-through'
           : 'text-zinc-700 dark:text-zinc-300';
         const inner = `
 <div class="mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors ${checkboxClass}">${

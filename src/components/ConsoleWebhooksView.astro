@@ -101,7 +101,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
 >
   <header>
     <h1 class="text-xl font-semibold mb-1">{wTitle}</h1>
-    <p class="text-sm text-zinc-500 dark:text-zinc-400">{wDesc}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400">{wDesc}</p>
   </header>
 
   <div id="webhooks-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
@@ -157,19 +157,19 @@ const eventKeys: Array<keyof typeof wEvents> = [
     <!-- List -->
     <div>
       <h2 class="text-sm font-semibold mb-2">Webhooks</h2>
-      <div id="webhooks-loading" class="flex items-center gap-2 text-sm text-zinc-500 italic">
+      <div id="webhooks-loading" class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300 italic">
         <svg class="animate-spin h-4 w-4 text-zinc-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
         <span>{c.loading}</span>
       </div>
-      <div id="webhooks-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+      <div id="webhooks-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
         {wEmpty}
       </div>
       <div id="webhooks-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
         <table class="min-w-full text-sm">
-          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
             <tr>
               <th class="px-3 py-2">{wCols.url ?? 'URL'}</th>
               <th class="px-3 py-2">{wCols.events ?? 'Events'}</th>
@@ -187,12 +187,12 @@ const eventKeys: Array<keyof typeof wEvents> = [
     <!-- Deliveries -->
     <div>
       <h2 class="text-sm font-semibold mb-2">{wDeliv.heading ?? 'Recent deliveries'}</h2>
-      <div id="deliveries-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-4 text-center text-xs text-zinc-500">
+      <div id="deliveries-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-4 text-center text-xs text-zinc-600 dark:text-zinc-300">
         {wDelivEmpty}
       </div>
       <div id="deliveries-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
         <table class="min-w-full text-xs">
-          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
             <tr>
               <th class="px-3 py-2">{wDeliv.event ?? 'Event'}</th>
               <th class="px-3 py-2">{wDeliv.status ?? 'Status'}</th>
@@ -355,7 +355,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
   function renderDrilldown(webhookId: string): string {
     const state = drilldown.get(webhookId);
     if (!state) {
-      return `<tr id="drilldown-${esc(webhookId)}"><td colspan="6" class="px-3 py-3 bg-zinc-50/60 dark:bg-zinc-900/40 text-xs text-zinc-500 italic">Loading deliveries…</td></tr>`;
+      return `<tr id="drilldown-${esc(webhookId)}"><td colspan="6" class="px-3 py-3 bg-zinc-50/60 dark:bg-zinc-900/40 text-xs text-zinc-600 dark:text-zinc-300 italic">Loading deliveries…</td></tr>`;
     }
     const filtered = state.perWebhookRows.filter(d => deliveryMatchesFilter(d, state.filter));
     const hasReplayable = state.perWebhookRows.length > 0;
@@ -373,20 +373,20 @@ const eventKeys: Array<keyof typeof wEvents> = [
     };
 
     const tableBody = filtered.length === 0
-      ? `<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-zinc-500 italic">${esc(labelDelivEmpty)}</td></tr>`
+      ? `<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-zinc-600 dark:text-zinc-300 italic">${esc(labelDelivEmpty)}</td></tr>`
       : filtered.map(d => {
           const noncePart = d.nonce ? d.nonce.slice(0, 10) + '…' : '—';
           return `
             <tr>
               <td class="px-3 py-2 font-mono text-[11px]">${esc(d.event)}</td>
               <td class="px-3 py-2">${statusPill(d.status_code)}</td>
-              <td class="px-3 py-2 text-zinc-500 text-[11px]">${esc(fmtDate(d.attempted_at))}</td>
-              <td class="px-3 py-2 text-zinc-500 text-[11px] font-mono">
+              <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300 text-[11px]">${esc(fmtDate(d.attempted_at))}</td>
+              <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300 text-[11px] font-mono">
                 ${d.nonce
                   ? `<button type="button" data-copy-nonce="${esc(d.nonce)}" title="${esc(d.nonce)}" class="hover:underline">${esc(noncePart)}</button>`
                   : '—'}
               </td>
-              <td class="px-3 py-2 text-zinc-500 text-[11px] max-w-[260px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
+              <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300 text-[11px] max-w-[260px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
             </tr>
           `;
         }).join('');
@@ -394,10 +394,10 @@ const eventKeys: Array<keyof typeof wEvents> = [
     const pagerHtml = totalPages > 1
       ? `<div class="flex items-center justify-between mt-2">
            <button type="button" data-deliv-prev="${esc(webhookId)}" class="px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50" ${state.page === 0 ? 'disabled' : ''}>${esc(labelDelivPrev)}</button>
-           <span class="text-[11px] text-zinc-500">${esc(pageInfo)}</span>
+           <span class="text-[11px] text-zinc-600 dark:text-zinc-300">${esc(pageInfo)}</span>
            <button type="button" data-deliv-next="${esc(webhookId)}" class="px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50" ${state.page >= totalPages - 1 ? 'disabled' : ''}>${esc(labelDelivNext)}</button>
          </div>`
-      : (pageInfo ? `<div class="mt-2 text-[11px] text-zinc-500 text-center">${esc(pageInfo)}</div>` : '');
+      : (pageInfo ? `<div class="mt-2 text-[11px] text-zinc-600 dark:text-zinc-300 text-center">${esc(pageInfo)}</div>` : '');
 
     return `
       <tr id="drilldown-${esc(webhookId)}">
@@ -416,7 +416,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
           </div>
           <div class="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
             <table class="min-w-full text-xs">
-              <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+              <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
                 <tr>
                   <th class="px-3 py-2">${esc(labelColEvent)}</th>
                   <th class="px-3 py-2">${esc(labelColStatus)}</th>
@@ -457,9 +457,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
       const mainRow = `
         <tr>
           <td class="px-3 py-2 font-mono text-xs break-all max-w-[260px]">${esc(w.url)}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500">${esc(eventsTxt)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">${esc(eventsTxt)}</td>
           <td class="px-3 py-2">${enabledPill} ${statusPill(w.last_delivery_status)}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtDate(w.last_delivery_at))}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">${esc(fmtDate(w.last_delivery_at))}</td>
           <td class="px-3 py-2 text-right tabular-nums text-zinc-700 dark:text-zinc-300">${w.consecutive_failures}</td>
           <td class="px-3 py-2 text-right whitespace-nowrap">
             <button data-test-id="${esc(w.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1">${esc(labelTest)}</button>
@@ -523,8 +523,8 @@ const eventKeys: Array<keyof typeof wEvents> = [
       <tr>
         <td class="px-3 py-2 font-mono">${esc(d.event)}</td>
         <td class="px-3 py-2">${statusPill(d.status_code)}</td>
-        <td class="px-3 py-2 text-zinc-500">${esc(fmtDate(d.attempted_at))}</td>
-        <td class="px-3 py-2 text-zinc-500 max-w-[300px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
+        <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300">${esc(fmtDate(d.attempted_at))}</td>
+        <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300 max-w-[300px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
       </tr>
     `).join('');
   }

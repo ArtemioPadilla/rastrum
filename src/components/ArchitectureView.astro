@@ -189,7 +189,7 @@ const intro = isEs
         </g>
       </svg>
     </div>
-    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic max-w-3xl">
+    <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-3 italic max-w-3xl">
       {isEs
         ? 'Flujos principales: el cliente carga modelos / fotos desde R2, llama a Edge Functions para identificar y exportar, y nunca habla directamente con servicios externos — la Edge Function intermedia para mantener las API keys del operador en el backend.'
         : 'Principal flows: the client loads models/photos from R2, calls Edge Functions to identify and export, and never talks to external services directly — the Edge Function brokers calls so operator API keys stay backend-side.'}
@@ -326,7 +326,7 @@ const intro = isEs
         </g>
       </svg>
     </div>
-    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic max-w-3xl">
+    <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-3 italic max-w-3xl">
       {isEs
         ? 'Primer respondedor con confianza ≥ 0.5 gana; los demás se cancelan. Ver '
         : 'First responder with confidence ≥ 0.5 wins; others abort. See '}
@@ -430,7 +430,7 @@ const intro = isEs
         <text x="410" y="250" text-anchor="middle" font-size="9" fill="currentColor" font-style="italic">online · visible</text>
       </svg>
     </div>
-    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic max-w-3xl">
+    <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-3 italic max-w-3xl">
       {isEs
         ? 'El outbox es la única ruta — incluso cuando estás online. Eso evita una bifurcación de código entre el camino feliz y el camino offline.'
         : 'The outbox is the only path — even when you are online. That avoids a fork between the happy path and the offline path.'}
@@ -553,7 +553,7 @@ const intro = isEs
         <text x="790" y="180" text-anchor="middle" font-size="9" fill="currentColor" font-style="italic">{isEs ? 'verifica hash · scopes' : 'verifies hash · scopes'}</text>
       </svg>
     </div>
-    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic max-w-3xl">
+    <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-3 italic max-w-3xl">
       {isEs
         ? 'Los tokens rst_* se muestran en texto plano una sola vez al crearlos; después de eso solo el hash SHA-256 vive en la BD. La REST API y el servidor MCP comparten el mismo verificador, lo que mantiene los scopes consistentes en ambas superficies.'
         : 'rst_* tokens are shown in plaintext exactly once at creation; after that, only the SHA-256 hash lives in the DB. The REST API and MCP server share the same verifier, keeping scopes consistent across both surfaces.'}
@@ -571,9 +571,9 @@ const intro = isEs
       <table class="w-full text-sm">
         <thead class="bg-zinc-50 dark:bg-zinc-900">
           <tr class="border-b border-zinc-200 dark:border-zinc-800">
-            <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">{isEs ? 'Capa' : 'Layer'}</th>
-            <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">{isEs ? 'Elección' : 'Choice'}</th>
-            <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">{isEs ? 'Justificación' : 'Rationale'}</th>
+            <th class="text-left py-2 px-3 text-zinc-600 dark:text-zinc-400 font-medium">{isEs ? 'Capa' : 'Layer'}</th>
+            <th class="text-left py-2 px-3 text-zinc-600 dark:text-zinc-400 font-medium">{isEs ? 'Elección' : 'Choice'}</th>
+            <th class="text-left py-2 px-3 text-zinc-600 dark:text-zinc-400 font-medium">{isEs ? 'Justificación' : 'Rationale'}</th>
           </tr>
         </thead>
         <tbody class="text-zinc-700 dark:text-zinc-300">

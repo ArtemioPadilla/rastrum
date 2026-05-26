@@ -34,18 +34,18 @@ const isEs = lang === 'es';
       </div>
     </div>
 
-    <div id="disputes-loading" class="text-sm text-zinc-500 dark:text-zinc-400 italic">
+    <div id="disputes-loading" class="text-sm text-zinc-600 dark:text-zinc-400 italic">
       {isEs ? 'Cargando disputas…' : 'Loading disputes…'}
     </div>
 
     <div id="disputes-not-configured" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'La tabla de disputas de licencia no está configurada aún.' : 'License disputes table not configured yet.'}
       </p>
     </div>
 
     <div id="disputes-empty" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'No hay disputas de licencia pendientes.' : 'No pending license disputes.'}
       </p>
     </div>
@@ -56,7 +56,7 @@ const isEs = lang === 'es';
       <button id="disputes-prev" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         ←
       </button>
-      <span id="disputes-page" class="text-zinc-500"></span>
+      <span id="disputes-page" class="text-zinc-600 dark:text-zinc-300"></span>
       <button id="disputes-next" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         →
       </button>
@@ -152,7 +152,7 @@ const isEs = lang === 'es';
               <span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(String(dispute.observation_id ?? dispute.id).slice(0, 8))}…</span>
               ${statusPill(dispute.status as string)}
             </div>
-            <p class="text-xs text-zinc-500 mt-0.5 truncate">${escapeHtml(String(dispute.reason ?? (isEs ? 'Sin razón' : 'No reason')))}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5 truncate">${escapeHtml(String(dispute.reason ?? (isEs ? 'Sin razón' : 'No reason')))}</p>
             <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(date)}</p>
           </div>
         `;

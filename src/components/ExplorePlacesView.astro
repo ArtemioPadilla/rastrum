@@ -111,7 +111,7 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
         id="places-prev"
         class="px-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >{page.prev}</button>
-      <span id="places-page-label" class="text-sm text-zinc-500"></span>
+      <span id="places-page-label" class="text-sm text-zinc-600 dark:text-zinc-300"></span>
       <button
         id="places-next"
         class="px-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -242,11 +242,11 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
         </h2>
         <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}">${escHtml(typeName)}</span>
       </div>
-      <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
         <span>🔭 ${escHtml(obsLabel)}</span>
         <span>🌿 ${escHtml(sppLabel)}</span>
         ${observersStr ? `<span>${escHtml(observersStr)}</span>` : ''}
-        ${lastActivityStr ? `<span class="text-zinc-400 dark:text-zinc-500">${escHtml(lastActivityStr)}</span>` : ''}
+        ${lastActivityStr ? `<span class="text-zinc-400 dark:text-zinc-300">${escHtml(lastActivityStr)}</span>` : ''}
       </div>
     </a>`;
   }

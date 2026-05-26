@@ -65,7 +65,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
         {headingText}
       </h2>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
         {caveatText}
       </p>
     </div>
@@ -90,7 +90,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
     </button>
   </div>
 
-  <div id="obs2-contextual-status" class="text-xs text-zinc-400 dark:text-zinc-500">
+  <div id="obs2-contextual-status" class="text-xs text-zinc-400 dark:text-zinc-300">
     {loadingText}
   </div>
 
@@ -102,7 +102,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
     <!-- Cards rendered by client script -->
   </ul>
 
-  <div id="obs2-contextual-empty" class="hidden text-xs text-zinc-500 dark:text-zinc-400">
+  <div id="obs2-contextual-empty" class="hidden text-xs text-zinc-600 dark:text-zinc-400">
     {emptyText}
   </div>
 </section>

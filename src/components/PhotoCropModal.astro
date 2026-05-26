@@ -38,7 +38,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       <h2 id="rastrum-crop-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
         {obs.crop_title}
       </h2>
-      <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{obs.crop_subtitle}</p>
+      <p class="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">{obs.crop_subtitle}</p>
     </header>
 
     <div class="px-5 py-4 space-y-3">
@@ -54,7 +54,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
         ></canvas>
       </div>
 
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">{obs.crop_drag_hint}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 text-center">{obs.crop_drag_hint}</p>
 
       <div class="flex items-center justify-center gap-2">
         <button
@@ -92,7 +92,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
             <label for="rastrum-crop-brightness" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
               {obs.crop_brightness_label}
             </label>
-            <span id="rastrum-crop-brightness-val" class="text-xs font-mono text-zinc-500 dark:text-zinc-400" aria-live="polite">0</span>
+            <span id="rastrum-crop-brightness-val" class="text-xs font-mono text-zinc-600 dark:text-zinc-400" aria-live="polite">0</span>
           </div>
           <input
             id="rastrum-crop-brightness"
@@ -110,7 +110,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
             <label for="rastrum-crop-contrast" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
               {obs.crop_contrast_label}
             </label>
-            <span id="rastrum-crop-contrast-val" class="text-xs font-mono text-zinc-500 dark:text-zinc-400" aria-live="polite">0</span>
+            <span id="rastrum-crop-contrast-val" class="text-xs font-mono text-zinc-600 dark:text-zinc-400" aria-live="polite">0</span>
           </div>
           <input
             id="rastrum-crop-contrast"
@@ -128,7 +128,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
             <label for="rastrum-crop-exposure" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
               {obs.exposure_label}
             </label>
-            <span id="rastrum-crop-exposure-val" class="text-xs font-mono text-zinc-500 dark:text-zinc-400" aria-live="polite">0</span>
+            <span id="rastrum-crop-exposure-val" class="text-xs font-mono text-zinc-600 dark:text-zinc-400" aria-live="polite">0</span>
           </div>
           <input
             id="rastrum-crop-exposure"

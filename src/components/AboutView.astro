@@ -163,7 +163,7 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
             href={`https://github.com/${m.github}`}
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+            class="inline-flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 .297a12 12 0 00-3.79 23.4c.6.111.82-.261.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 17.07 3.633 16.7 3.633 16.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.694.825.576A12 12 0 0012 .297z"/>
@@ -174,7 +174,7 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
       </div>
     ))}
   </div>
-  <p class="text-xs text-zinc-500 dark:text-zinc-500 mb-4">{people.no_photo_note}</p>
+  <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-4">{people.no_photo_note}</p>
   <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
     {people.join_cta}
     {' '}
@@ -205,7 +205,7 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
     </div>
   </div>
   <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">{funding.byo_keys_note}</p>
-  <p class="text-xs text-zinc-500 dark:text-zinc-500 leading-relaxed">
+  <p class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
     {funding.ledger_note}
     {' '}
     <a href={fundingHref} class="text-emerald-600 dark:text-emerald-400 hover:underline">{tr.footer.links.funding}</a>.
@@ -247,23 +247,23 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
       <div class="grid sm:grid-cols-3 gap-4 mb-4">
         <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
           <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_observations)}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observations_label}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observations_label}</p>
         </div>
         <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
           <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_observers)}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observers_label}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observers_label}</p>
         </div>
         <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
           <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_species)}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.species_label}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.species_label}</p>
         </div>
       </div>
       {generatedLabel && (
-        <p class="text-xs text-zinc-500 dark:text-zinc-500 text-right">{statsTr.generated_prefix}: {generatedLabel}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 text-right">{statsTr.generated_prefix}: {generatedLabel}</p>
       )}
     </>
   ) : (
-    <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center text-sm text-zinc-500 dark:text-zinc-400">
+    <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center text-sm text-zinc-600 dark:text-zinc-400">
       {statsTr.unavailable}
     </div>
   )}
@@ -320,11 +320,11 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
               "text-xs font-mono px-2 py-0.5 rounded",
               i === 0
                 ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
             ]}>{phase.version}</span>
             <h3 class:list={[
               "font-semibold",
-              i === 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400"
+              i === 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-400"
             ]}>{phase.name}</h3>
           </div>
           <ul class="space-y-1 ml-1">
@@ -376,7 +376,7 @@ const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE
 <!-- Press / mentions -->
 <section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="press">
   <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{press.title}</h2>
-  <p class="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-3xl">{press.empty}</p>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl">{press.empty}</p>
 </section>
 
 <!-- Open Source / GitHub CTA -->

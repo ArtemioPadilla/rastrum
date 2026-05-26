@@ -26,7 +26,7 @@ const { lang } = Astro.props;
 
   <!-- Error state -->
   <div id="place-error" class="hidden py-16 text-center">
-    <p class="text-zinc-500 text-lg" id="place-error-text">Place not found.</p>
+    <p class="text-zinc-600 dark:text-zinc-300 text-lg" id="place-error-text">Place not found.</p>
     <a href="javascript:history.back()" class="mt-4 inline-block text-sm text-emerald-600 hover:underline">← Go back</a>
   </div>
 
@@ -40,7 +40,7 @@ const { lang } = Astro.props;
         <span id="place-source-badge" class="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"></span>
       </div>
       <h1 id="place-name" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100"></h1>
-      <p id="place-location-line" class="text-sm text-zinc-500 mt-0.5"></p>
+      <p id="place-location-line" class="text-sm text-zinc-600 dark:text-zinc-300 mt-0.5"></p>
       <p id="place-description" class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 hidden"></p>
     </div>
 

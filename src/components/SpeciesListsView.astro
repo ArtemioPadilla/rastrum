@@ -47,11 +47,11 @@ const labels = {
 >
   <!-- Signed-out -->
   <div id="sl-signed-out" class="hidden py-16 text-center">
-    <p class="text-zinc-500 dark:text-zinc-400">{labels.sign_in}</p>
+    <p class="text-zinc-600 dark:text-zinc-400">{labels.sign_in}</p>
   </div>
 
   <!-- Loading skeleton -->
-  <div id="sl-loading" class="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+  <div id="sl-loading" class="py-10 text-center text-sm text-zinc-600 dark:text-zinc-400">
     {labels.loading}
   </div>
 
@@ -138,7 +138,7 @@ const labels = {
 
     <!-- Empty state -->
     <div id="sl-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
-      <p class="text-sm text-zinc-500 dark:text-zinc-400">{labels.empty}</p>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400">{labels.empty}</p>
     </div>
 
     <!-- Lists grid -->
@@ -225,11 +225,11 @@ const labels = {
             <a href="${href}" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 hover:text-emerald-700 dark:hover:text-emerald-400 leading-snug">${name}</a>
             ${isPrivate ? `<span class="shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">${escAttr(labels.private_badge)}</span>` : ''}
           </div>
-          ${desc ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">${desc}</p>` : ''}
-          <p class="text-xs text-zinc-400 dark:text-zinc-500">${count} ${escAttr(labels.items)}</p>
+          ${desc ? `<p class="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2">${desc}</p>` : ''}
+          <p class="text-xs text-zinc-400 dark:text-zinc-300">${count} ${escAttr(labels.items)}</p>
           <div class="flex gap-2 mt-auto pt-1">
             <a href="${href}" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escAttr(labels.view)} →</a>
-            <button type="button" class="sl-edit-btn text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:underline" data-id="${escAttr(l.id)}">${escAttr(labels.edit)}</button>
+            <button type="button" class="sl-edit-btn text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:underline" data-id="${escAttr(l.id)}">${escAttr(labels.edit)}</button>
             <button type="button" class="sl-delete-btn text-xs font-medium text-red-500 hover:underline ml-auto" data-id="${escAttr(l.id)}">${escAttr(labels.delete)}</button>
           </div>
         </div>`;

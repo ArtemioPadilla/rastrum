@@ -49,7 +49,7 @@ export function renderSpeciesCard(d: CardData, labels: CardLabels): string {
     <div class="p-3">
       <p class="text-sm italic font-bold text-emerald-700 dark:text-emerald-400 truncate">${escAttr(d.scientificName)}</p>
       ${d.commonName ? `<p class="text-sm text-zinc-700 dark:text-zinc-300 truncate">${escAttr(d.commonName)}</p>` : ''}
-      <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">${escAttr(d.metaLine)}</p>
+      <p class="text-[11px] text-zinc-600 dark:text-zinc-400 mt-1.5">${escAttr(d.metaLine)}</p>
     </div>
   </${tag}>`;
 }

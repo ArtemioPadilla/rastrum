@@ -55,7 +55,7 @@ const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
 
   <!-- Empty state -->
   <div id="donate-empty" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-    <p class="text-zinc-500 dark:text-zinc-400">{sp.donate_no_pools}</p>
+    <p class="text-zinc-600 dark:text-zinc-400">{sp.donate_no_pools}</p>
   </div>
 
   <!-- Pool list -->
@@ -80,7 +80,7 @@ const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
         <label for="donate-calls" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{sp.donate_calls_label}</label>
         <input id="donate-calls" name="calls" type="number" min="10" max="10000" value="100" required
           class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
-        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{sp.donate_calls_hint}</p>
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{sp.donate_calls_hint}</p>
       </div>
 
       <!-- Feedback -->
@@ -170,14 +170,14 @@ const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
         '<div class="flex items-center justify-between gap-4">' +
           '<div class="min-w-0">' +
             '<h3 class="font-semibold text-zinc-900 dark:text-zinc-100 truncate">' + poolLabel + ': ' + escapeHtml(pool.credential_label) + '</h3>' +
-            '<p class="text-sm text-zinc-500 dark:text-zinc-400">' + modelLabel + ': ' + escapeHtml(pool.preferred_model) + '</p>' +
+            '<p class="text-sm text-zinc-600 dark:text-zinc-400">' + modelLabel + ': ' + escapeHtml(pool.preferred_model) + '</p>' +
           '</div>' +
           '<button type="button" data-pool-id="' + pool.id + '" class="donate-btn shrink-0 px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">' +
             confirmLabel +
           '</button>' +
         '</div>' +
         '<div>' +
-          '<div class="flex justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1">' +
+          '<div class="flex justify-between text-xs text-zinc-600 dark:text-zinc-400 mb-1">' +
             '<span>' + capacityLabel + '</span>' +
             '<span>' + pool.used.toLocaleString() + ' / ' + pool.total_cap.toLocaleString() + ' (' + pct + '%)</span>' +
           '</div>' +

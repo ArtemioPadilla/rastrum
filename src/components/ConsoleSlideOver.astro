@@ -52,7 +52,7 @@ const customLabel = tr.console.quick_reason_custom;
     <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
       <header class="flex justify-between items-start">
         <h2 data-slideover-title class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{titleKey}</h2>
-        <button type="button" data-slideover-close class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xl leading-none">&times;</button>
+        <button type="button" data-slideover-close class="text-zinc-600 dark:text-zinc-300 hover:text-zinc-700 dark:hover:text-zinc-300 text-xl leading-none">&times;</button>
       </header>
       <div data-slideover-fields class="space-y-3 text-sm">
         <slot />
@@ -68,7 +68,7 @@ const customLabel = tr.console.quick_reason_custom;
           <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
           {templates.length > 0 && (
             <div data-reason-pills class="flex flex-wrap gap-1.5 mb-2">
-              <span class="text-[10px] text-zinc-500 self-center">{tr.console.quick_reasons_label}</span>
+              <span class="text-[10px] text-zinc-600 dark:text-zinc-300 self-center">{tr.console.quick_reasons_label}</span>
               {templates.map(tmpl => (
                 <button
                   type="button"
@@ -84,7 +84,7 @@ const customLabel = tr.console.quick_reason_custom;
         </label>
         <p data-slideover-error class="hidden text-sm text-red-600 dark:text-red-400"></p>
       </div>
-      <p class="text-[10px] text-zinc-500">{tr.console.slideover_audit_note}</p>
+      <p class="text-[10px] text-zinc-600 dark:text-zinc-300">{tr.console.slideover_audit_note}</p>
     </div>
 
     <!-- Sticky bottom button row — sticky on mobile, relative on md+ -->

@@ -47,12 +47,12 @@ const labelNotFound = lang === 'es' ? 'Perfil no encontrado.' : 'Profile not fou
     <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
       {labelHeading}
     </h1>
-    <p data-fv-subtitle class="text-sm text-zinc-500 dark:text-zinc-400 mt-1"></p>
+    <p data-fv-subtitle class="text-sm text-zinc-600 dark:text-zinc-400 mt-1"></p>
   </header>
 
-  <p data-fv-loading class="text-sm text-zinc-500 text-center py-8">{labelLoading}</p>
-  <p data-fv-not-found class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelNotFound}</p>
-  <p data-fv-empty class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelEmpty}</p>
+  <p data-fv-loading class="text-sm text-zinc-600 dark:text-zinc-300 text-center py-8">{labelLoading}</p>
+  <p data-fv-not-found class="hidden text-sm text-zinc-600 dark:text-zinc-300 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelNotFound}</p>
+  <p data-fv-empty class="hidden text-sm text-zinc-600 dark:text-zinc-300 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelEmpty}</p>
 
   <ul data-fv-list class="hidden divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
 </section>
@@ -180,7 +180,7 @@ const labelNotFound = lang === 'es' ? 'Perfil no encontrado.' : 'Profile not fou
       nameEl.className = 'font-medium text-zinc-900 dark:text-zinc-100 truncate';
       nameEl.textContent = name;
       const handleEl = document.createElement('div');
-      handleEl.className = 'text-sm text-zinc-500 dark:text-zinc-400 truncate';
+      handleEl.className = 'text-sm text-zinc-600 dark:text-zinc-400 truncate';
       handleEl.textContent = handleStr ? `@${handleStr}` : '';
       text.appendChild(nameEl);
       text.appendChild(handleEl);

@@ -35,18 +35,18 @@ const isEs = lang === 'es';
       </div>
     </div>
 
-    <div id="overrides-loading" class="text-sm text-zinc-500 dark:text-zinc-400 italic">
+    <div id="overrides-loading" class="text-sm text-zinc-600 dark:text-zinc-400 italic">
       {isEs ? 'Cargando correcciones…' : 'Loading overrides…'}
     </div>
 
     <div id="overrides-not-configured" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'La tabla de identificaciones no está configurada aún.' : 'Identifications table not configured yet.'}
       </p>
     </div>
 
     <div id="overrides-empty" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'No hay correcciones de identificación.' : 'No identification overrides found.'}
       </p>
     </div>
@@ -57,7 +57,7 @@ const isEs = lang === 'es';
       <button id="overrides-prev" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         ←
       </button>
-      <span id="overrides-page" class="text-zinc-500"></span>
+      <span id="overrides-page" class="text-zinc-600 dark:text-zinc-300"></span>
       <button id="overrides-next" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         →
       </button>
@@ -144,7 +144,7 @@ const isEs = lang === 'es';
               <span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(String(row.taxon_name ?? (isEs ? 'Sin nombre' : 'Unnamed')))}</span>
               <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">${escapeHtml(String(row.source ?? 'human'))}</span>
             </div>
-            <p class="text-xs text-zinc-500 mt-0.5 truncate">${isEs ? 'Observación' : 'Observation'}: ${escapeHtml(String(row.observation_id ?? '—').slice(0, 8))}…</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5 truncate">${isEs ? 'Observación' : 'Observation'}: ${escapeHtml(String(row.observation_id ?? '—').slice(0, 8))}…</p>
             <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(date)}</p>
           </div>
         `;

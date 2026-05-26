@@ -17,7 +17,7 @@ const tr = t(lang);
   </div>
 
   <div id="flagq-shell" class="hidden">
-    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{tr.console.flagq_intro}</p>
+    <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.flagq_intro}</p>
 
     <!-- Filter row -->
     <div class="flex flex-wrap gap-2 mb-3">
@@ -53,8 +53,8 @@ const tr = t(lang);
     <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-220px)]">
       <!-- Left: report list -->
       <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-        <div id="flagq-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.flagq_loading}</div>
-        <div id="flagq-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.flagq_empty}</div>
+        <div id="flagq-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.flagq_loading}</div>
+        <div id="flagq-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{tr.console.flagq_empty}</div>
         <ul id="flagq-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
       </aside>
 
@@ -64,22 +64,22 @@ const tr = t(lang);
       </div>
       <div id="flagq-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <dt class="text-zinc-500">{tr.console.flagq_col_type}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_col_type}</dt>
           <dd id="flagq-detail-type" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.flagq_col_reason}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_col_reason}</dt>
           <dd id="flagq-detail-reason" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.flagq_col_status}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_col_status}</dt>
           <dd id="flagq-detail-status" class="font-medium"></dd>
 
-          <dt class="text-zinc-500">{tr.console.flagq_col_created}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_col_created}</dt>
           <dd id="flagq-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.flagq_reporter_label}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_reporter_label}</dt>
           <dd id="flagq-detail-reporter" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.flagq_target_label}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_target_label}</dt>
           <dd id="flagq-detail-target" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
         </dl>
 
@@ -89,7 +89,7 @@ const tr = t(lang);
             <img id="flagq-preview-thumb" class="hidden h-20 w-20 rounded object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" loading="lazy" alt="" />
             <span class="min-w-0 flex-1">
               <span id="flagq-preview-title" class="block text-sm font-medium text-zinc-800 dark:text-zinc-200 break-words"></span>
-              <span id="flagq-preview-sub" class="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></span>
+              <span id="flagq-preview-sub" class="block text-xs text-zinc-600 dark:text-zinc-400 mt-0.5"></span>
               <span id="flagq-preview-snippet" class="hidden text-xs text-zinc-600 dark:text-zinc-300 mt-1 italic break-words"></span>
             </span>
           </a>
@@ -97,7 +97,7 @@ const tr = t(lang);
         <p id="flagq-preview-unavailable" class="hidden text-xs text-zinc-400 dark:text-zinc-600 italic">{tr.console.flagq_preview_unavailable}</p>
 
         <div id="flagq-detail-note-row" class="hidden text-sm">
-          <span class="text-zinc-500">{tr.console.flagq_note_label}: </span>
+          <span class="text-zinc-600 dark:text-zinc-300">{tr.console.flagq_note_label}: </span>
           <span id="flagq-detail-note" class="text-zinc-700 dark:text-zinc-300 italic"></span>
         </div>
 
@@ -239,18 +239,18 @@ const tr = t(lang);
     open: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
     triaged: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
     resolved: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
-    dismissed: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+    dismissed: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300',
   };
 
   function renderList() {
     const ul = document.getElementById('flagq-list')!;
     ul.innerHTML = allReports.map(r => {
       const isSelected = r.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
-      const statusCls = STATUS_COLORS[r.status] ?? 'bg-zinc-100 text-zinc-500';
+      const statusCls = STATUS_COLORS[r.status] ?? 'bg-zinc-100 text-zinc-600 dark:text-zinc-300';
       return `<li data-report-id="${escHtml(r.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="flex items-center gap-2 mb-0.5">
           <span class="inline-block text-[9px] rounded px-1 py-0.5 ${statusCls}">${escHtml(r.status)}</span>
-          <span class="text-[10px] text-zinc-500">${escHtml(r.target_type)}</span>
+          <span class="text-[10px] text-zinc-600 dark:text-zinc-300">${escHtml(r.target_type)}</span>
         </div>
         <div class="text-sm text-zinc-800 dark:text-zinc-200 truncate">${escHtml(r.reason)}</div>
         <div class="text-xs text-zinc-400">${escHtml(fmtDate(r.created_at))}</div>

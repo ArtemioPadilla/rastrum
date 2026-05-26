@@ -29,7 +29,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     )}
   </header>
 
-  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+  <p data-state="empty" class="hidden text-xs text-zinc-600 dark:text-zinc-300 italic py-4">
     {lang === 'es' ? 'Aún sin especies destacadas.' : 'No species yet.'}
   </p>
 
@@ -75,7 +75,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
             ${imgPart}
             <div class="p-2">
               <p class="text-xs italic text-emerald-700 dark:text-emerald-400 truncate">${escAttr(r.scientific_name)}</p>
-              <p class="text-[10px] text-zinc-500">${r.obs_count} obs</p>
+              <p class="text-[10px] text-zinc-600 dark:text-zinc-300">${r.obs_count} obs</p>
             </div>
           </a>
         </li>`;

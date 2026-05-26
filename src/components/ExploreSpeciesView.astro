@@ -81,11 +81,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         {lang === 'es' ? 'Cuadrícula' : 'Grid'}
       </button>
       <button id="es-tab-radial" data-view="radial" role="tab" aria-selected="false"
-        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
         {lang === 'es' ? 'Radial' : 'Radial'}
       </button>
       <button id="es-tab-tree" data-view="tree" role="tab" aria-selected="false"
-        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
         {lang === 'es' ? 'Árbol' : 'Tree'}
       </button>
     </div>
@@ -108,22 +108,22 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       <!-- Sunburst sub-panel -->
       <div id="es-radial-sub-panel-sunburst">
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+        <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
           {lang === 'es' ? 'Toca un segmento para explorar. Doble toque en especie para ver su perfil.' : 'Tap a segment to explore. Double-tap a species to view its profile.'}
         </p>
         <div id="es-sunburst-container" class="relative w-full max-w-md mx-auto" style="aspect-ratio: 1;">
           <svg id="es-sunburst" width="100%" height="100%" viewBox="-1 -1 2 2" style="display:block;"></svg>
           <div id="es-sunburst-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <p id="es-sunburst-name" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-center px-8"></p>
-            <p id="es-sunburst-count" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+            <p id="es-sunburst-count" class="text-xs text-zinc-600 dark:text-zinc-400"></p>
           </div>
         </div>
-        <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
+        <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-600 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
       </div>
 
       <!-- #681: Radial Dendrogram sub-panel -->
       <div id="es-radial-sub-panel-dendro" class="hidden">
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+        <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
           {lang === 'es'
             ? 'Reino en el centro, especies en la periferia. Toca una especie para ver su perfil.'
             : 'Kingdom at center, species at periphery. Tap a species to view its profile.'}
@@ -137,7 +137,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     <!-- M34: Dendrogram tree panel (hidden by default) -->
     <div id="es-panel-tree" class="hidden">
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
         {lang === 'es' ? 'Jerarquía taxonómica. Toca una especie para ver su perfil.' : 'Taxonomic hierarchy. Tap a species to view its profile.'}
       </p>
       <div class="overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3" style="max-height: 70vh;">
@@ -175,7 +175,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       <ul class="es-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></ul>
 
-      <p class="es-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+      <p class="es-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-600 dark:text-zinc-400">
         {page.empty}
       </p>
 
@@ -213,7 +213,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           <div
             class="es-d-map w-full h-[40vh] sm:h-[50vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
           ></div>
-          <p class="es-d-no-coords hidden absolute inset-0 flex items-center justify-center text-sm text-zinc-500 text-center px-4"></p>
+          <p class="es-d-no-coords hidden absolute inset-0 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300 text-center px-4"></p>
         </div>
       </section>
 
@@ -609,7 +609,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         if (active) {
           btn.className += 'border-emerald-700 text-emerald-700 dark:text-emerald-400 dark:border-emerald-400';
         } else {
-          btn.className += 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200';
+          btn.className += 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200';
         }
       });
 
@@ -1439,7 +1439,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         if (typeof v === 'string' && v) chain.push({ rank: r.label, name: v });
       }
       taxonomyEl.innerHTML = chain
-        .map(c => `<li><span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:text-zinc-300"><span class="text-zinc-500 mr-1">${escapeText(c.rank)}</span>${escapeText(c.name)}</span></li>`)
+        .map(c => `<li><span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:text-zinc-300"><span class="text-zinc-600 mr-1">${escapeText(c.rank)}</span>${escapeText(c.name)}</span></li>`)
         .join('');
     }
 

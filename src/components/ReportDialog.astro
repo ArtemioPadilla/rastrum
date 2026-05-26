@@ -32,13 +32,13 @@ const reportTr = tr.socialgraph.report;
     <header class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
       <h2 id="rastrum-report-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
         <span data-rd-title-text>{reportTr.title.replace('{{target}}', '')}</span>
-        <span data-rd-target-label class="ml-1 text-zinc-500 dark:text-zinc-400 font-normal"></span>
+        <span data-rd-target-label class="ml-1 text-zinc-600 dark:text-zinc-400 font-normal"></span>
       </h2>
     </header>
 
     <form id="rastrum-report-form" class="px-5 py-4 space-y-4">
       <fieldset class="space-y-1.5">
-        <legend class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <legend class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
           {lang === 'es' ? 'Motivo' : 'Reason'}
         </legend>
         {[
@@ -63,7 +63,7 @@ const reportTr = tr.socialgraph.report;
       </fieldset>
 
       <div class="space-y-1.5">
-        <label for="rastrum-report-note" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <label for="rastrum-report-note" class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
           {lang === 'es' ? 'Nota (opcional)' : 'Note (optional)'}
         </label>
         <textarea

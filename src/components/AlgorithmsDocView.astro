@@ -50,12 +50,12 @@ const ids = Object.keys(ALGORITHMS) as Array<keyof typeof ALGORITHMS>;
           <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             {isEs ? entry.summary.es : entry.summary.en}
           </p>
-          <p class="text-[11px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mt-1">
+          <p class="text-[11px] uppercase tracking-wider text-zinc-400 dark:text-zinc-300 mt-1">
             <code class="text-[11px]">{id}</code>
           </p>
         </header>
         <div>
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
             {isEs ? 'Entradas usadas' : 'Inputs used'}
           </h4>
           <ul class="list-disc pl-5 space-y-1 text-sm text-zinc-800 dark:text-zinc-200">
@@ -63,13 +63,13 @@ const ids = Object.keys(ALGORITHMS) as Array<keyof typeof ALGORITHMS>;
           </ul>
         </div>
         <div>
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
             {isEs ? 'Ventana de tiempo' : 'Time window'}
           </h4>
           <p class="text-sm text-zinc-800 dark:text-zinc-200">{copy.window}</p>
         </div>
         <div>
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
             {isEs ? '¿Cómo cambio esto?' : 'How do I change this?'}
           </h4>
           <a
@@ -96,7 +96,7 @@ const ids = Object.keys(ALGORITHMS) as Array<keyof typeof ALGORITHMS>;
       : 'Private observations never appear in public surfaces, even when your account is public.'}</li>
   </ul>
 
-  <p class="text-sm text-zinc-500 mt-8">
+  <p class="text-sm text-zinc-600 dark:text-zinc-300 mt-8">
     {isEs ? 'Catálogo: ' : 'Catalog: '}
     <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/src/lib/algorithms.ts" class="underline">src/lib/algorithms.ts</a>
   </p>

@@ -39,8 +39,8 @@ const tr = t(lang);
           <option value="Bacteria">Bacteria</option>
         </select>
       </div>
-      <div id="taxa-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
-      <div id="taxa-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.taxa_empty}</div>
+      <div id="taxa-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
+      <div id="taxa-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{tr.console.taxa_empty}</div>
       <ul id="taxa-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
     </aside>
 
@@ -51,28 +51,28 @@ const tr = t(lang);
     <div id="taxa-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 overflow-y-auto space-y-5">
       <div>
         <div id="taxa-detail-name" class="text-lg font-semibold italic text-zinc-900 dark:text-zinc-100"></div>
-        <div id="taxa-detail-common" class="text-sm text-zinc-500 mt-0.5"></div>
+        <div id="taxa-detail-common" class="text-sm text-zinc-600 dark:text-zinc-300 mt-0.5"></div>
         <div class="mt-2 flex flex-wrap gap-1.5" id="taxa-detail-chips"></div>
       </div>
 
       <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <dt class="text-zinc-500">{tr.console.taxa_col_kingdom}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_kingdom}</dt>
         <dd id="taxa-detail-kingdom" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_rank}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_rank}</dt>
         <dd id="taxa-detail-rank" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_obs_count}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_obs_count}</dt>
         <dd id="taxa-detail-obs-count" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_rarity_bucket}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_rarity_bucket}</dt>
         <dd id="taxa-detail-rarity-bucket" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_rarity_multiplier}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_rarity_multiplier}</dt>
         <dd id="taxa-detail-rarity-mult" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_nom059}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_nom059}</dt>
         <dd id="taxa-detail-nom059" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_cites}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_cites}</dt>
         <dd id="taxa-detail-cites" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_iucn}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_iucn}</dt>
         <dd id="taxa-detail-iucn" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-        <dt class="text-zinc-500">{tr.console.taxa_col_obscure}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.taxa_col_obscure}</dt>
         <dd id="taxa-detail-obscure" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
       </dl>
 
@@ -100,7 +100,7 @@ const tr = t(lang);
       <div id="taxa-flag-form" class="hidden mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-3">
         <h4 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{tr.console.taxa_flag_slide_heading}</h4>
         <div>
-          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_flag_label}</label>
+          <label class="block text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.taxa_flag_flag_label}</label>
           <select id="taxa-flag-type" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
             <option value="nom059_status">NOM-059 (E/P/A/Pr)</option>
             <option value="cites_appendix">CITES Appendix (I/II/III)</option>
@@ -108,12 +108,12 @@ const tr = t(lang);
           </select>
         </div>
         <div>
-          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_value_label}</label>
+          <label class="block text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.taxa_flag_value_label}</label>
           <input id="taxa-flag-value" type="text" placeholder=""
             class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
         </div>
         <div>
-          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_reason_label}</label>
+          <label class="block text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.taxa_flag_reason_label}</label>
           <textarea id="taxa-flag-reason" rows="2" placeholder={tr.console.taxa_flag_reason_placeholder}
             class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
         </div>
@@ -249,7 +249,7 @@ const tr = t(lang);
         : '';
       return `<li data-taxa-id="${escHtml(tx.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="font-medium text-sm italic text-zinc-900 dark:text-zinc-100 truncate">${escHtml(tx.scientific_name)}</div>
-        <div class="text-xs text-zinc-500 capitalize">${escHtml(tx.kingdom ?? '')} · ${escHtml(tx.taxon_rank)}</div>
+        <div class="text-xs text-zinc-600 dark:text-zinc-300 capitalize">${escHtml(tx.kingdom ?? '')} · ${escHtml(tx.taxon_rank)}</div>
         <div class="mt-0.5 flex gap-1">${bucketBadge}${conservation}</div>
       </li>`;
     }).join('');

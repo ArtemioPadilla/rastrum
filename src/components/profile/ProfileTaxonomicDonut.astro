@@ -29,7 +29,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     )}
   </header>
 
-  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+  <p data-state="empty" class="hidden text-xs text-zinc-600 dark:text-zinc-300 italic py-4">
     {lang === 'es' ? 'Sin datos suficientes.' : 'Not enough data yet.'}
   </p>
 
@@ -94,9 +94,9 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
         const colour = PALETTE[s.kingdom] ?? '#71717a';
         const pct = Math.round(s.share * 100);
         const counts = `${rows[i].species_count} sp · ${s.obs_count} obs`;
-        return `<li class="flex items-center gap-2"><span class="inline-block w-2.5 h-2.5 rounded" style="background:${colour}"></span><span class="font-medium">${s.kingdom}</span><span class="ml-auto text-xs text-zinc-500">${pct}% · ${counts}</span></li>`;
+        return `<li class="flex items-center gap-2"><span class="inline-block w-2.5 h-2.5 rounded" style="background:${colour}"></span><span class="font-medium">${s.kingdom}</span><span class="ml-auto text-xs text-zinc-600 dark:text-zinc-300">${pct}% · ${counts}</span></li>`;
       })
-      .join('') + `<li class="text-xs text-zinc-500 mt-2">${totalObs} total</li>`;
+      .join('') + `<li class="text-xs text-zinc-600 dark:text-zinc-300 mt-2">${totalObs} total</li>`;
   }
 
   document.querySelectorAll<HTMLElement>('[data-widget="taxonomic-donut"]').forEach(hydrate);

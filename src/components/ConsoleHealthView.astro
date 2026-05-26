@@ -67,7 +67,7 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="text-xl font-semibold mb-1">{hTitle}</h1>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{hDesc}</p>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl">{hDesc}</p>
     </div>
     <button
       id="health-refresh-btn"
@@ -123,10 +123,10 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
   <article id="health-hero" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
     <header class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
       <div>
-        <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-semibold">{hHeroLabel}</p>
+        <p class="text-[11px] uppercase tracking-wide text-zinc-600 dark:text-zinc-400 font-semibold">{hHeroLabel}</p>
         <h2 id="health-hero-week" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></h2>
       </div>
-      <div class="text-xs text-zinc-500 dark:text-zinc-400">
+      <div class="text-xs text-zinc-600 dark:text-zinc-400">
         <span class="font-mono" id="health-hero-id"></span>
       </div>
     </header>
@@ -137,7 +137,7 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
   <article id="health-trends" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
     <header class="flex items-baseline justify-between gap-2 mb-3">
       <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{hTrendsHeading}</h2>
-      <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="health-trends-range"></p>
+      <p class="text-[11px] text-zinc-600 dark:text-zinc-400" id="health-trends-range"></p>
     </header>
     <div id="health-trends-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
   </article>
@@ -205,17 +205,17 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
       const prevVal = prev ? Number(prev.metrics?.[key] ?? 0) : null;
       const delta = prevVal === null ? null : computeMetricDelta(cur, prevVal, key);
       const deltaPill = delta === null
-        ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500">${esc(noPrev)}</span>`
+        ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">${esc(noPrev)}</span>`
         : `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono ${trendColorClass(delta.trend)}" aria-label="${esc(deltaLabel)} ${delta.absolute > 0 ? '+' : ''}${delta.absolute} (${delta.percent}%)">
               ${trendArrow(delta.trend)} ${delta.absolute > 0 ? '+' : ''}${delta.absolute}
               <span class="ml-1 opacity-70">${delta.percent > 0 ? '+' : ''}${delta.percent}%</span>
            </span>`;
       cards.push(`
         <div class="rounded border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 bg-zinc-50/50 dark:bg-zinc-900/40">
-          <dt class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</dt>
+          <dt class="text-[11px] uppercase tracking-wide text-zinc-600 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</dt>
           <dd class="mt-1 flex items-baseline justify-between gap-2">
             <span class="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${cur.toLocaleString()}</span>
-            <span class="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">${deltaPill}<span class="ml-1">${esc(vsPrevText)}</span></span>
+            <span class="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400">${deltaPill}<span class="ml-1">${esc(vsPrevText)}</span></span>
           </dd>
         </div>
       `);
@@ -257,7 +257,7 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
       }).join('');
       tiles.push(`
         <div class="rounded border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 bg-zinc-50/50 dark:bg-zinc-900/40">
-          <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</p>
+          <p class="text-[11px] uppercase tracking-wide text-zinc-600 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</p>
           <div class="mt-1 flex items-end justify-between gap-2">
             <span class="text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${total.toLocaleString()}</span>
             <svg width="${widthPx}" height="40" viewBox="0 0 ${widthPx} 40" aria-hidden="true">${bars}</svg>

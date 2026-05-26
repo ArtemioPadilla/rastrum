@@ -38,9 +38,9 @@ const tr = t(lang);
       />
     </div>
 
-    <div id="sync-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+    <div id="sync-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
 
-    <div id="sync-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+    <div id="sync-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
       {tr.console.sync_empty}
     </div>
 
@@ -165,16 +165,16 @@ const tr = t(lang);
       const firstRow = rows[0];
       const rowsHtml = rows.map(r => `
         <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-          <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.failure_day)}</td>
+          <td class="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-300">${escHtml(r.failure_day)}</td>
           <td class="px-3 py-2 text-xs text-center font-semibold">${r.hit_count ?? 1}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500">${escHtml(r.app_version ?? '—')}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">${escHtml(r.app_version ?? '—')}</td>
           <td class="px-3 py-2 text-xs">
             ${r.user_id
               ? `<a href="/console/users/?focus=${escHtml(r.user_id)}" class="text-emerald-700 dark:text-emerald-400 underline text-xs">${escHtml(viewUserLabel)}</a>`
               : '<span class="text-zinc-400">—</span>'}
           </td>
           <td class="px-3 py-2 text-xs text-zinc-400">${r.blob_count ?? 0}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500 font-mono">${r.last_seen_at ? escHtml(new Date(r.last_seen_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300 font-mono">${r.last_seen_at ? escHtml(new Date(r.last_seen_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
           <td class="px-3 py-2">
             <button disabled title="${escHtml(retryLabel)}" class="rounded px-2 py-0.5 text-xs border border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed">${escHtml(retryLabel)}</button>
           </td>
@@ -185,7 +185,7 @@ const tr = t(lang);
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
           <div class="bg-zinc-100 dark:bg-zinc-800/60 px-4 py-2 flex items-center justify-between">
             <span class="font-mono text-xs text-zinc-600 dark:text-zinc-400 truncate">${escHtml(hash)}</span>
-            <span class="text-xs text-zinc-500 shrink-0 ml-3">${rows.length} day${rows.length !== 1 ? 's' : ''}</span>
+            <span class="text-xs text-zinc-600 dark:text-zinc-300 shrink-0 ml-3">${rows.length} day${rows.length !== 1 ? 's' : ''}</span>
           </div>
           <div class="px-4 py-2 text-sm text-zinc-800 dark:text-zinc-200 bg-red-50 dark:bg-red-900/10 border-b border-zinc-200 dark:border-zinc-800 break-all">
             ${escHtml(firstRow.error_message)}
@@ -193,7 +193,7 @@ const tr = t(lang);
           <div class="overflow-x-auto">
             <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100">
               <thead>
-                <tr class="text-left text-xs text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+                <tr class="text-left text-xs text-zinc-600 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800">
                   <th class="px-3 py-2 font-medium">Day</th>
                   <th class="px-3 py-2 font-medium text-center">Hits</th>
                   <th class="px-3 py-2 font-medium">App version</th>

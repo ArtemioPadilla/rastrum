@@ -54,7 +54,7 @@ const copy = {
       <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
         {copy.title}
       </h1>
-      <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
         {copy.subtitle}
       </p>
     </div>
@@ -73,7 +73,7 @@ const copy = {
   <section aria-labelledby="my-trails-heading">
     <h2
       id="my-trails-heading"
-      class="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3"
+      class="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400 mb-3"
     >
       {copy.myTrails}
     </h2>
@@ -85,7 +85,7 @@ const copy = {
     >
       <!-- Skeleton / loading state -->
       <div id="my-trails-loading" class="col-span-full">
-        <p class="text-sm text-zinc-500">{copy.loading}</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-300">{copy.loading}</p>
       </div>
       <!-- Content rendered by client script -->
     </div>
@@ -95,7 +95,7 @@ const copy = {
   <section aria-labelledby="nearby-trails-heading">
     <h2
       id="nearby-trails-heading"
-      class="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3"
+      class="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400 mb-3"
     >
       {copy.nearbyTrails}
     </h2>
@@ -106,7 +106,7 @@ const copy = {
       aria-label={copy.nearbyTrails}
     >
       <div id="nearby-trails-loading" class="col-span-full">
-        <p class="text-sm text-zinc-500">{copy.loading}</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-300">{copy.loading}</p>
       </div>
     </div>
   </section>
@@ -206,7 +206,7 @@ const copy = {
         data-trail-id="${trail.id}"
       >
         <h3 class="font-semibold text-zinc-900 dark:text-zinc-50 line-clamp-2">${escapeHtml(trail.name)}</h3>
-        <div class="flex flex-wrap gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <div class="flex flex-wrap gap-3 text-xs text-zinc-600 dark:text-zinc-400">
           <span class="flex items-center gap-1"><span>🌿</span>${trail.total_species} ${tr.species}</span>
           <span class="flex items-center gap-1"><span>📍</span>${trail.total_observations} ${tr.observations}</span>
           <span class="flex items-center gap-1"><span>🗺️</span>${waypointCount} ${tr.waypoints}</span>
@@ -247,7 +247,7 @@ const copy = {
 
         document.getElementById('my-trails-loading')?.remove();
         if (!myTrails || myTrails.length === 0) {
-          myList.innerHTML = `<p class="col-span-full text-sm text-zinc-500">${tr.emptyMy}</p>`;
+          myList.innerHTML = `<p class="col-span-full text-sm text-zinc-600 dark:text-zinc-300">${tr.emptyMy}</p>`;
         } else {
           myList.innerHTML = myTrails.map(makeTrailCard).join('');
         }
@@ -266,7 +266,7 @@ const copy = {
 
       document.getElementById('nearby-trails-loading')?.remove();
       if (!nearbyTrails || nearbyTrails.length === 0) {
-        nearbyList.innerHTML = `<p class="col-span-full text-sm text-zinc-500">${tr.emptyNearby}</p>`;
+        nearbyList.innerHTML = `<p class="col-span-full text-sm text-zinc-600 dark:text-zinc-300">${tr.emptyNearby}</p>`;
       } else {
         nearbyList.innerHTML = nearbyTrails.map(makeTrailCard).join('');
       }

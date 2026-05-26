@@ -54,7 +54,7 @@ const s = tr.search;
         aria-autocomplete="list"
         aria-controls="cmd-palette-listbox"
       />
-      <kbd class="hidden sm:block text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex-shrink-0">Esc</kbd>
+      <kbd class="hidden sm:block text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex-shrink-0">Esc</kbd>
     </div>
 
     <!-- Results listbox -->
@@ -212,7 +212,7 @@ const s = tr.search;
     function makeGroupHeader(label: string): HTMLLIElement {
       const li = document.createElement('li');
       li.role = 'presentation';
-      li.className = 'px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500';
+      li.className = 'px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-300';
       li.textContent = label;
       return li;
     }

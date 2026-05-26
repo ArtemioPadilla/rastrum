@@ -87,7 +87,7 @@ const observe = tr.observe;
   <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
     {v.manage_heading}
   </h2>
-  <p class="text-xs text-zinc-500 dark:text-zinc-400">{v.manage_private}</p>
+  <p class="text-xs text-zinc-600 dark:text-zinc-400">{v.manage_private}</p>
 
   <div role="tablist" aria-label={v.manage_heading} class="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
     <button
@@ -108,7 +108,7 @@ const observe = tr.observe;
       aria-controls="m-panel-location"
       tabindex="-1"
       data-tab-button="location"
-      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
+      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
     >{od.tabs.location}</button>
     <button
       type="button"
@@ -118,7 +118,7 @@ const observe = tr.observe;
       aria-controls="m-panel-photos"
       tabindex="-1"
       data-tab-button="photos"
-      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
+      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
     >{od.tabs.photos}</button>
   </div>
 
@@ -181,7 +181,7 @@ const observe = tr.observe;
           placeholder="e.g. Quercus oleoides"
           class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic"
         />
-        <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{v.scientific_help}</p>
+        <p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">{v.scientific_help}</p>
       </div>
 
       <div>
@@ -255,10 +255,10 @@ const observe = tr.observe;
     <div class="space-y-2">
       <h3 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{od.location.current_heading}</h3>
       <MapPicker mode="view" lang={lang} pickerId="obs-detail-loc-view" initialCoords={null} />
-      <p data-loc-coords class="text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+      <p data-loc-coords class="text-xs text-zinc-600 dark:text-zinc-400" aria-live="polite"></p>
     </div>
 
-    <p class="text-xs text-zinc-500 dark:text-zinc-400">{od.location.edit_intro}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400">{od.location.edit_intro}</p>
 
     <div class="flex flex-wrap items-center gap-2">
       <button
@@ -276,10 +276,10 @@ const observe = tr.observe;
         initialCoords={null}
         openLabel={od.location.edit_button}
       />
-      <span id="m-loc-saving" class="hidden text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite">{od.location.saving}</span>
+      <span id="m-loc-saving" class="hidden text-xs text-zinc-600 dark:text-zinc-400" aria-live="polite">{od.location.saving}</span>
       <span id="m-loc-saved"  class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{od.saved}</span>
     </div>
-    <p id="m-loc-gps-status" class="hidden text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+    <p id="m-loc-gps-status" class="hidden text-xs text-zinc-600 dark:text-zinc-400" aria-live="polite"></p>
     <p id="m-loc-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
   </div>
 
@@ -309,7 +309,7 @@ const observe = tr.observe;
     </div>
     <p
       id="m-photos-empty"
-      class="hidden text-xs text-zinc-500 dark:text-zinc-400 italic"
+      class="hidden text-xs text-zinc-600 dark:text-zinc-400 italic"
     >{tr.obs_detail.gallery.no_photos}</p>
     <p
       id="m-photos-error"
@@ -332,7 +332,7 @@ const observe = tr.observe;
       >{od.add_photo}</button>
       <span
         id="m-photos-busy"
-        class="hidden text-xs text-zinc-500 dark:text-zinc-400"
+        class="hidden text-xs text-zinc-600 dark:text-zinc-400"
         aria-live="polite"
       ></span>
     </div>
@@ -357,7 +357,7 @@ const observe = tr.observe;
         b.classList.toggle('text-emerald-700', active);
         b.classList.toggle('dark:text-emerald-400', active);
         b.classList.toggle('border-transparent', !active);
-        b.classList.toggle('text-zinc-500', !active);
+        b.classList.toggle('text-zinc-600 dark:text-zinc-300', !active);
         b.classList.toggle('dark:text-zinc-400', !active);
         if (active && focus) b.focus();
       }

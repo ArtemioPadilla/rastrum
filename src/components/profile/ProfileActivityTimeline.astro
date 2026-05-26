@@ -42,7 +42,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     <button data-filter="badges"       class="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{filterBadges}</button>
   </div>
 
-  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+  <p data-state="empty" class="hidden text-xs text-zinc-600 dark:text-zinc-300 italic py-4">
     {lang === 'es' ? 'Sin actividad reciente.' : 'No recent activity.'}
   </p>
 
@@ -110,7 +110,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
       });
       const groups = groupActivityByWeek(filtered);
       if (!groups.length) {
-        groupsEl!.innerHTML = `<p class="text-xs text-zinc-500 italic py-2">${isEs ? 'Sin coincidencias.' : 'No matches.'}</p>`;
+        groupsEl!.innerHTML = `<p class="text-xs text-zinc-600 dark:text-zinc-300 italic py-2">${isEs ? 'Sin coincidencias.' : 'No matches.'}</p>`;
         return;
       }
       groupsEl!.innerHTML = groups.map((g) => {
@@ -120,7 +120,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
             <span class="ml-2 font-medium">${escAttr(r.event_kind)}</span>
           </li>`).join('');
         return `<div>
-          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">${escAttr(label)}</h3>
+          <h3 class="text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5">${escAttr(label)}</h3>
           <ul class="space-y-1">${items}</ul>
         </div>`;
       }).join('');

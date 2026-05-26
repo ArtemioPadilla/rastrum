@@ -62,7 +62,7 @@ const labels = {
     </h3>
   )}
   <div class="cascade-trace-body" data-cascade-trace-body>
-    <p class="text-xs italic text-zinc-500" data-cascade-trace-empty>{labels.noData}</p>
+    <p class="text-xs italic text-zinc-600 dark:text-zinc-300" data-cascade-trace-empty>{labels.noData}</p>
   </div>
 </div>
 
@@ -82,9 +82,9 @@ const labels = {
   .ct-row.ct-accepted .ct-icon { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300; }
   .ct-row.ct-rejected .ct-icon { @apply bg-amber-100   text-amber-700   dark:bg-amber-900/40   dark:text-amber-300; }
   .ct-row.ct-failed   .ct-icon { @apply bg-red-100     text-red-700     dark:bg-red-900/40     dark:text-red-300; }
-  .ct-row.ct-skipped  .ct-icon { @apply bg-zinc-100    text-zinc-500    dark:bg-zinc-800       dark:text-zinc-400; }
+  .ct-row.ct-skipped  .ct-icon { @apply bg-zinc-100    text-zinc-600    dark:bg-zinc-800       dark:text-zinc-400; }
   .ct-row.ct-aborted  .ct-icon { @apply bg-indigo-100  text-indigo-700  dark:bg-indigo-900/40  dark:text-indigo-300; }
-  .ct-row.ct-not_run  .ct-icon { @apply bg-zinc-100    text-zinc-400    dark:bg-zinc-800       dark:text-zinc-500; }
+  .ct-row.ct-not_run  .ct-icon { @apply bg-zinc-100    text-zinc-400    dark:bg-zinc-800       dark:text-zinc-300; }
   .ct-bar { @apply flex-1 h-1.5 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden; }
   .ct-bar > span { @apply block h-full; }
   .ct-row.ct-accepted .ct-bar > span { @apply bg-emerald-500; }
@@ -126,7 +126,7 @@ function rowHtml(att: CascadeAttemptUI, dataset: DOMStringMap): string {
   const stateLabel = labelMap[att.state] ?? att.state;
   const conf = att.confidence != null ? Math.round(att.confidence * 100) : null;
   const barWidth = conf != null ? Math.min(100, Math.max(0, conf)) : 0;
-  const reason = att.reason ? `<span class="text-zinc-500 dark:text-zinc-400 italic ml-2">— ${escapeHtml(att.reason)}</span>` : '';
+  const reason = att.reason ? `<span class="text-zinc-600 dark:text-zinc-400 italic ml-2">— ${escapeHtml(att.reason)}</span>` : '';
   const result = att.result?.scientific_name
     ? `<span class="italic text-emerald-700 dark:text-emerald-400 ml-1">${escapeHtml(att.result.scientific_name)}</span>`
     : '';
@@ -137,10 +137,10 @@ function rowHtml(att: CascadeAttemptUI, dataset: DOMStringMap): string {
       <span class="font-medium text-zinc-800 dark:text-zinc-200">
         ${att.brand ? `<span aria-hidden="true">${escapeHtml(att.brand)}</span> ` : ''}${escapeHtml(att.display_name)}
       </span>
-      <span class="text-zinc-500 dark:text-zinc-400 text-[10px] capitalize">${stateLabel}</span>
+      <span class="text-zinc-600 dark:text-zinc-400 text-[10px] capitalize">${stateLabel}</span>
       ${conf != null ? `
         <div class="ct-bar"><span style="width: ${barWidth}%"></span></div>
-        <span class="text-zinc-500 tabular-nums w-10 text-right">${conf}%</span>
+        <span class="text-zinc-600 dark:text-zinc-300 tabular-nums w-10 text-right">${conf}%</span>
       ` : '<span class="ct-bar"></span>'}
       ${result}
       ${reason}
@@ -151,7 +151,7 @@ function rowHtml(att: CascadeAttemptUI, dataset: DOMStringMap): string {
 function compactSummary(data: CascadeTraceData): string {
   const winner = data.attempts.find(a => a.state === 'accepted');
   if (!winner) {
-    return `<span class="text-zinc-500">${data.attempts.map(a => `${a.brand ?? ''}${a.display_name}`).join(' → ')}</span>`;
+    return `<span class="text-zinc-600 dark:text-zinc-300">${data.attempts.map(a => `${a.brand ?? ''}${a.display_name}`).join(' → ')}</span>`;
   }
   const conf = winner.confidence != null ? ` ${Math.round(winner.confidence * 100)}%` : '';
   return `<span class="text-emerald-700 dark:text-emerald-400 font-medium">${winner.brand ?? ''} ${winner.display_name}${conf}</span>`;
@@ -169,7 +169,7 @@ function render(el: HTMLElement, data: CascadeTraceData): void {
   }
 
   const rows = data.attempts.map(a => rowHtml(a, el.dataset)).join('');
-  const thresholdHint = `<p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">${el.dataset.labelThreshold ?? 'accept threshold'}: ${Math.round(data.threshold * 100)}%</p>`;
+  const thresholdHint = `<p class="text-[10px] text-zinc-400 dark:text-zinc-300 mt-2">${el.dataset.labelThreshold ?? 'accept threshold'}: ${Math.round(data.threshold * 100)}%</p>`;
   body.innerHTML = rows + thresholdHint;
   el.classList.remove('hidden');
 }

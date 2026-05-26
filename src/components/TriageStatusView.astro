@@ -82,34 +82,34 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
   <div class="not-prose grid sm:grid-cols-3 gap-4 mt-6">
     <a href={issuesOpen} target="_blank" rel="noopener"
        class="block p-5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/40 transition-colors">
-      <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
+      <p class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-2">
         {triage.stat_open}
       </p>
       <p class="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
         {openLabel}
       </p>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.stat_open_help}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">{triage.stat_open_help}</p>
     </a>
 
     <div class="block p-5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-      <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
+      <p class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-2">
         {triage.stat_median}
       </p>
       <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
         {medianLabel}
       </p>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.stat_median_help}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">{triage.stat_median_help}</p>
     </div>
 
     <a href={issuesClosed} target="_blank" rel="noopener"
        class="block p-5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/40 transition-colors">
-      <p class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">
+      <p class="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-2">
         {triage.stat_resolved}
       </p>
       <p class="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
         {resolvedLabel}
       </p>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.stat_resolved_help}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">{triage.stat_resolved_help}</p>
     </a>
   </div>
 
@@ -140,11 +140,11 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
       </a>
     </li>
   </ul>
-  <p class="text-sm text-zinc-500 dark:text-zinc-400">{triage.report_inapp}</p>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400">{triage.report_inapp}</p>
 
   <hr class="my-8" />
 
-  <dl class="not-prose text-sm grid sm:grid-cols-3 gap-x-6 gap-y-2 text-zinc-500 dark:text-zinc-400">
+  <dl class="not-prose text-sm grid sm:grid-cols-3 gap-x-6 gap-y-2 text-zinc-600 dark:text-zinc-400">
     <div>
       <dt class="font-semibold text-zinc-700 dark:text-zinc-300">{triage.data_freshness}</dt>
       <dd class={isStub ? 'italic' : ''}>{isStub ? '—' : generatedLabel}</dd>
@@ -158,5 +158,5 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
       <dd class={isStub ? 'italic' : ''}>{sampleLabel}</dd>
     </div>
   </dl>
-  <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.data_source}</p>
+  <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">{triage.data_source}</p>
 </div>

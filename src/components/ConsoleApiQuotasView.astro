@@ -14,9 +14,9 @@ const tr = t(lang);
   </div>
 
   <div id="api-shell" class="hidden space-y-6">
-    <div id="api-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+    <div id="api-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
     <div id="api-cards" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-    <div id="api-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+    <div id="api-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
       {tr.console.api_empty}
     </div>
 
@@ -25,7 +25,7 @@ const tr = t(lang);
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
           <thead>
-            <tr class="text-left text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
+            <tr class="text-left text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
               <th class="px-3 py-2 font-medium">Date</th>
               <th class="px-3 py-2 font-medium">Provider</th>
               <th class="px-3 py-2 font-medium text-right">{tr.console.api_used}</th>
@@ -175,7 +175,7 @@ const tr = t(lang);
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
           <div class="flex items-center justify-between">
             <span class="font-semibold capitalize text-zinc-900 dark:text-zinc-100">${escHtml(provider)}</span>
-            <span class="text-xs text-zinc-500">${escHtml(todayStr)}</span>
+            <span class="text-xs text-zinc-600 dark:text-zinc-300">${escHtml(todayStr)}</span>
           </div>
           <div class="space-y-1">
             <div class="flex justify-between text-sm">
@@ -185,16 +185,16 @@ const tr = t(lang);
             <div class="rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 h-2 w-full">
               <div class="${color} h-2 rounded-full transition-all" style="width:${pctPx / 2}%"></div>
             </div>
-            <div class="text-right text-xs text-zinc-500">${(pct * 100).toFixed(1)}% used · ${remaining.toLocaleString()} remaining</div>
+            <div class="text-right text-xs text-zinc-600 dark:text-zinc-300">${(pct * 100).toFixed(1)}% used · ${remaining.toLocaleString()} remaining</div>
           </div>
           ${sparkPath ? `
           <div>
-            <div class="text-xs text-zinc-500 mb-1">7-day usage</div>
+            <div class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">7-day usage</div>
             <svg width="80" height="24" viewBox="0 0 80 24" class="overflow-visible">
               <path d="${escHtml(sparkPath)}" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-500" />
             </svg>
           </div>` : ''}
-          <div class="text-xs text-zinc-500">
+          <div class="text-xs text-zinc-600 dark:text-zinc-300">
             <span class="font-medium">ETA:</span> ${escHtml(eta)}
           </div>
         </div>
@@ -208,7 +208,7 @@ const tr = t(lang);
     const tbody = document.getElementById('api-table-body')!;
     tbody.innerHTML = allRows.map(r => `
       <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.date)}</td>
+        <td class="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-300">${escHtml(r.date)}</td>
         <td class="px-3 py-2 text-xs capitalize">${escHtml(r.provider)}</td>
         <td class="px-3 py-2 text-xs text-right font-mono">${r.used.toLocaleString()}</td>
         <td class="px-3 py-2 text-xs text-right font-mono">${r.quota.toLocaleString()}</td>

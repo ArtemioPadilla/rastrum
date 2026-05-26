@@ -220,14 +220,14 @@ export function renderUserPill(
   const meta = ctx.users[id];
   if (meta?.username) return `<span class="text-zinc-700 dark:text-zinc-300">@${escapeHtml(meta.username)}</span>`;
   if (meta?.display_name) return `<span class="text-zinc-700 dark:text-zinc-300">${escapeHtml(meta.display_name)}</span>`;
-  return `<span class="font-mono text-[10px] text-zinc-500">${escapeHtml(id.slice(0, 8))}…</span>`;
+  return `<span class="font-mono text-[10px] text-zinc-600 dark:text-zinc-300">${escapeHtml(id.slice(0, 8))}…</span>`;
 }
 
 export function renderTaxonPill(id: string | null, fallback: string | null, ctx: RenderContext): string {
   if (id && ctx.taxa[id]?.scientific_name) {
     return `<span class="italic">${escapeHtml(ctx.taxa[id].scientific_name!)}</span>`;
   }
-  if (fallback) return `<span class="italic text-zinc-600">${escapeHtml(fallback)}</span>`;
+  if (fallback) return `<span class="italic text-zinc-600 dark:text-zinc-300">${escapeHtml(fallback)}</span>`;
   return '<span class="text-zinc-400">—</span>';
 }
 

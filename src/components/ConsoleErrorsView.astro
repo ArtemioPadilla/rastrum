@@ -59,7 +59,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="text-xl font-semibold mb-1">{eTitle}</h1>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{eDesc}</p>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl">{eDesc}</p>
     </div>
     <label class="inline-flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
       <input id="errors-auto-refresh" type="checkbox" class="rounded" />
@@ -115,7 +115,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
 
     <!-- Top codes mini-bar -->
     <div id="errors-top-codes" class="hidden rounded border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/30">
-      <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium mb-2">{eTopCodes}</p>
+      <p class="text-[11px] uppercase tracking-wide text-zinc-600 dark:text-zinc-400 font-medium mb-2">{eTopCodes}</p>
       <div id="errors-top-codes-list" class="flex flex-wrap gap-1.5"></div>
     </div>
 
@@ -139,7 +139,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
     <!-- Results table -->
     <div id="errors-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
       <table class="min-w-full text-sm">
-        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500 backdrop-blur">
+        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300 backdrop-blur">
           <tr>
             <th class="px-3 py-2">{eCols.timestamp ?? 'Timestamp'}</th>
             <th class="px-3 py-2">{eCols.function ?? 'Function / code'}</th>
@@ -175,7 +175,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
   titleKey={eSlide.bulkTitle ?? 'Acknowledge all matching errors'}
 >
   <p class="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">{eSlide.bulkConfirm ?? 'This will acknowledge up to 1000 unacknowledged rows matching the current filters.'}</p>
-  <p id="error-ack-bulk-summary" class="text-[11px] text-zinc-500 dark:text-zinc-400"></p>
+  <p id="error-ack-bulk-summary" class="text-[11px] text-zinc-600 dark:text-zinc-400"></p>
   <label class="block text-sm">
     <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
       {eSlide.notes ?? 'Notes (optional)'}
@@ -406,7 +406,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
     list.innerHTML = sorted.map(([code, n]) =>
       `<button type="button" data-filter-code="${esc(code)}" aria-label="${esc(labelFilterByCode)}: ${esc(code)}" class="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-2.5 py-0.5 text-[11px] hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
         <code class="font-mono">${esc(code)}</code>
-        <span class="text-zinc-500 dark:text-zinc-400">×${n}</span>
+        <span class="text-zinc-600 dark:text-zinc-400">×${n}</span>
       </button>`,
     ).join('');
     list.querySelectorAll<HTMLElement>('[data-filter-code]').forEach(btn => {
@@ -448,7 +448,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
         : esc(r.error_message ?? '');
       return `
         <tr id="errow-${esc(r.id)}" class="${acked ? 'opacity-60' : ''}" data-row-id="${esc(r.id)}">
-          <td class="px-3 py-2 whitespace-nowrap font-mono text-[11px] text-zinc-500">${esc(fmtTs(r.created_at))}</td>
+          <td class="px-3 py-2 whitespace-nowrap font-mono text-[11px] text-zinc-600 dark:text-zinc-300">${esc(fmtTs(r.created_at))}</td>
           <td class="px-3 py-2">
             <div class="flex flex-col gap-0.5">
               <span class="text-zinc-800 dark:text-zinc-200 font-medium">${esc(r.function_name)}</span>
@@ -459,7 +459,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
           <td class="px-3 py-2 text-xs max-w-[260px]">
             <span class="text-zinc-700 dark:text-zinc-300 break-words" title="${esc(r.error_message ?? '')}">${messageShort || '—'}</span>
           </td>
-          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[260px]">
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300 max-w-[260px]">
             ${ctxJson
               ? `<button type="button" data-toggle-ctx="${esc(r.id)}" aria-expanded="false" class="text-emerald-700 dark:text-emerald-400 hover:underline">${esc(labelExpand)}</button>
                  <pre id="ctx-${esc(r.id)}" class="hidden mt-1 whitespace-pre-wrap break-all rounded bg-zinc-50 dark:bg-zinc-900 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400">${esc(ctxJson)}</pre>`

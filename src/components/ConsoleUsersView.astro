@@ -34,8 +34,8 @@ const tr = t(lang);
           class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
         />
       </div>
-      <div id="users-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.users_loading}</div>
-      <div id="users-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.users_empty}</div>
+      <div id="users-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.users_loading}</div>
+      <div id="users-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{tr.console.users_empty}</div>
       <ul id="users-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
     </aside>
 
@@ -46,21 +46,21 @@ const tr = t(lang);
     <div id="users-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-5">
       <div>
         <div id="detail-name" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
-        <div id="detail-username" class="text-sm text-zinc-500"></div>
+        <div id="detail-username" class="text-sm text-zinc-600 dark:text-zinc-300"></div>
       </div>
 
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_roles_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2">{tr.console.users_roles_heading}</h3>
         <div id="detail-roles" class="flex flex-wrap gap-2"></div>
       </div>
 
       <div id="detail-identity-section" class="hidden">
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_identity_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2">{tr.console.users_identity_heading}</h3>
         <dl id="detail-identity" class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm text-zinc-700 dark:text-zinc-300"></dl>
       </div>
 
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_activity_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2">{tr.console.users_activity_heading}</h3>
         <dl id="detail-activity" data-failed-msg={tr.console.users_activity_failed} class="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300"></dl>
       </div>
     </div>
@@ -207,7 +207,7 @@ const tr = t(lang);
       const isSelected = u.id === selectedUserId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
       return `<li data-user-id="${escHtml(u.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="font-medium text-sm text-zinc-900 dark:text-zinc-100">${name}</div>
-        <div class="text-xs text-zinc-500">${uname}</div>
+        <div class="text-xs text-zinc-600 dark:text-zinc-300">${uname}</div>
         <div class="mt-1 flex flex-wrap gap-1">${chips}</div>
       </li>`;
     }).join('');
@@ -249,7 +249,7 @@ const tr = t(lang);
 
   async function loadActivity(userId: string) {
     const dl = document.getElementById('detail-activity')!;
-    dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
+    dl.innerHTML = '<dt class="text-zinc-600 dark:text-zinc-300 col-span-2 text-xs italic">Loading…</dt>';
 
     try {
       const [obsResult, rgResult, trustResult] = await Promise.all([
@@ -269,14 +269,14 @@ const tr = t(lang);
       const trust = trustResult.error ? null : (trustResult.data as number | null);
 
       dl.innerHTML = `
-        <dt class="text-zinc-500">Observations</dt><dd class="font-medium">${obsCount}</dd>
-        <dt class="text-zinc-500">Research grade</dt><dd class="font-medium">${rgCount}</dd>
-        ${trust !== null ? `<dt class="text-zinc-500">Trust score</dt><dd class="font-medium tabular-nums">${Number(trust).toFixed(0)}</dd>` : ''}
+        <dt class="text-zinc-600 dark:text-zinc-300">Observations</dt><dd class="font-medium">${obsCount}</dd>
+        <dt class="text-zinc-600 dark:text-zinc-300">Research grade</dt><dd class="font-medium">${rgCount}</dd>
+        ${trust !== null ? `<dt class="text-zinc-600 dark:text-zinc-300">Trust score</dt><dd class="font-medium tabular-nums">${Number(trust).toFixed(0)}</dd>` : ''}
       `;
     } catch (err) {
       console.warn('console: loadActivity failed', err);
       const msg = dl.dataset.failedMsg ?? 'Could not load activity stats.';
-      dl.innerHTML = `<dt class="text-zinc-500 col-span-2 text-sm">${msg}</dt>`;
+      dl.innerHTML = `<dt class="text-zinc-600 dark:text-zinc-300 col-span-2 text-sm">${msg}</dt>`;
     }
   }
 
@@ -284,7 +284,7 @@ const tr = t(lang);
     const section = document.getElementById('detail-identity-section')!;
     const dl = document.getElementById('detail-identity')!;
     section.classList.add('hidden');
-    dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
+    dl.innerHTML = '<dt class="text-zinc-600 dark:text-zinc-300 col-span-2 text-xs italic">Loading…</dt>';
 
     const session = await getCachedSession();
     if (!session?.access_token) return;
@@ -294,11 +294,11 @@ const tr = t(lang);
       section.classList.remove('hidden');
       const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString() : '—';
       const emailRow = `
-        <dt class="text-zinc-500 text-xs">Email</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300 text-xs">Email</dt>
         <dd class="text-xs font-mono">${escHtml(result.email ?? '—')}${result.email_confirmed_at ? ` <span class="text-zinc-400">(confirmed ${fmtDate(result.email_confirmed_at)})</span>` : ''}</dd>
       `;
       const idRows = (result.identities ?? []).map(i => `
-        <dt class="text-zinc-500 text-xs pl-2 border-l-2 border-zinc-200 dark:border-zinc-700">${escHtml(i.provider)}</dt>
+        <dt class="text-zinc-600 dark:text-zinc-300 text-xs pl-2 border-l-2 border-zinc-200 dark:border-zinc-700">${escHtml(i.provider)}</dt>
         <dd class="text-xs">${escHtml(i.email ?? '—')} · <span class="text-zinc-400">added ${fmtDate(i.created_at)} · last sign-in ${fmtDate(i.last_sign_in_at)}</span></dd>
       `).join('');
       dl.innerHTML = emailRow + idRows;

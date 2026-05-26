@@ -86,7 +86,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
       {title}
     </h1>
     <p data-pokedex-subtitle class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{subtitle}</p>
-    {subheading && !visitor && <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{subheading}</p>}
+    {subheading && !visitor && <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-1">{subheading}</p>}
     {visitor && (
       <p class="mt-2 text-xs">
         <a data-pokedex-back-link href="#" class="text-emerald-700 dark:text-emerald-400 hover:underline">{visitorBack}</a>
@@ -94,8 +94,8 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     )}
   </header>
 
-  <p id="pokedex-loading" class="text-sm text-zinc-500 text-center py-8">…</p>
-  <p id="pokedex-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{empty}</p>
+  <p id="pokedex-loading" class="text-sm text-zinc-600 dark:text-zinc-300 text-center py-8">…</p>
+  <p id="pokedex-empty"   class="hidden text-sm text-zinc-600 dark:text-zinc-300 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{empty}</p>
   {visitor && (
     <div id="pokedex-not-found" class="hidden py-8 text-center">
       <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{visitorNotFound}</p>
@@ -103,7 +103,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     </div>
   )}
   {visitor && (
-    <p id="pokedex-private" class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{visitorPrivate}</p>
+    <p id="pokedex-private" class="hidden text-sm text-zinc-600 dark:text-zinc-300 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{visitorPrivate}</p>
   )}
   {visitor && (
     <p id="pokedex-error" class="hidden text-sm text-red-700 dark:text-red-400 text-center py-8 rounded-lg border border-red-300 dark:border-red-800">{visitorLoadError}</p>
@@ -136,7 +136,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     </div>
   )}
   <div id="pokedex-grid" class="hidden mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
-  <p id="pokedex-missing-disclaimer" class="hidden mt-3 text-[11px] text-zinc-500 dark:text-zinc-500"></p>
+  <p id="pokedex-missing-disclaimer" class="hidden mt-3 text-[11px] text-zinc-600 dark:text-zinc-300"></p>
 </section>
 
 <style>
@@ -398,7 +398,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
       ? `<div class="text-base font-bold text-zinc-900 dark:text-zinc-100">${escAttr(r.dataset.labelHeroFirstTitle ?? '')}</div>
          <a href="${escAttr(r.dataset.hrefObserve ?? '')}" class="mt-2 inline-block text-sm text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">${escAttr(r.dataset.labelHeroFirstCta ?? '')} →</a>`
       : `<div class="text-5xl font-extrabold leading-none tracking-tight text-emerald-700 dark:text-emerald-400">${total}</div>
-         <div class="text-[11px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-1 font-semibold">${escAttr(r.dataset.labelHeroSpecies ?? '')}</div>
+         <div class="text-[11px] uppercase tracking-widest text-zinc-600 dark:text-zinc-400 mt-1 font-semibold">${escAttr(r.dataset.labelHeroSpecies ?? '')}</div>
          <div class="flex gap-3.5 mt-3 flex-wrap text-xs text-zinc-600 dark:text-zinc-300">
            <span><b class="text-zinc-900 dark:text-zinc-100">${kingdoms}</b> ${escAttr(r.dataset.labelHeroKingdoms ?? '')}</span>
            <span><b class="text-zinc-900 dark:text-zinc-100">${rares}</b> ${escAttr(r.dataset.labelHeroRares ?? '')}</span>
@@ -425,9 +425,9 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
              ? `<img src="${escAttr(suggestion.thumbnail_url)}" alt="${escAttr(suggestion.scientific_name)}" loading="lazy" class="flex-none rounded-lg object-cover" style="width:60px;height:60px;filter: grayscale(1) contrast(.5) brightness(.85); opacity:.55; border: 2px dashed #94a3b8;">`
              : `<div class="flex-none rounded-lg border-2 border-dashed border-zinc-400 bg-zinc-100 flex items-center justify-center text-zinc-400 text-2xl" style="width:60px;height:60px;">?</div>`}
            <div class="min-w-0">
-             <div class="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">${escAttr(r.dataset.labelHeroCatch ?? '')}</div>
+             <div class="text-[10px] uppercase tracking-widest text-zinc-600 dark:text-zinc-300 font-bold">${escAttr(r.dataset.labelHeroCatch ?? '')}</div>
              <div class="text-sm font-semibold italic text-zinc-900 dark:text-zinc-100 truncate">${escAttr(suggestion.scientific_name)}</div>
-             <div class="text-[11px] text-zinc-500 mt-0.5">${escAttr(r.dataset.labelHeroCatchWhy ?? '')}</div>
+             <div class="text-[11px] text-zinc-600 dark:text-zinc-300 mt-0.5">${escAttr(r.dataset.labelHeroCatchWhy ?? '')}</div>
            </div>
          </div>
          <a href="${escAttr(r.dataset.hrefExplore ?? '')}" class="mt-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">${escAttr(r.dataset.labelHeroCatchCta ?? '')}</a>`
@@ -530,7 +530,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
         </div>
         <div class="p-3">
           <p class="text-sm italic font-bold text-zinc-700 dark:text-zinc-200 truncate">${escAttr(m.scientific_name)}</p>
-          ${common ? `<p class="text-sm text-zinc-500 dark:text-zinc-400 truncate">${escAttr(common)}</p>` : ''}
+          ${common ? `<p class="text-sm text-zinc-600 dark:text-zinc-400 truncate">${escAttr(common)}</p>` : ''}
           <p class="text-amber-600 mt-1 tracking-widest text-xs">${meta}</p>
           <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1.5 group-hover:underline">${escAttr(cta)} →</p>
         </div>
@@ -754,7 +754,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
       : node.rank === 'Species'
         ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 inline-block mr-1.5 shrink-0"></span>'
         : '<span class="w-2 h-2 rounded-full bg-zinc-400 inline-block mr-1.5 shrink-0"></span>';
-    const obsLabel = `<span class="ml-auto text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">${node.observed} obs</span>`;
+    const obsLabel = `<span class="ml-auto text-[11px] text-zinc-600 dark:text-zinc-400 shrink-0">${node.observed} obs</span>`;
 
     if (isLeaf || node.rank === 'Species') {
       return `<div class="flex items-center py-1 px-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-sm" style="padding-left:${8 + indent}px">
@@ -772,7 +772,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
       <summary class="flex items-center py-1.5 px-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none text-sm select-none" style="padding-left:${8 + indent}px">
         <span class="mr-1 text-zinc-400 group-open:rotate-90 transition-transform duration-150" aria-hidden="true">▶</span>
         ${dot}<span class="${labelColor} truncate">${node.name}</span>
-        <span class="ml-1.5 text-[11px] rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-500 dark:text-zinc-400 shrink-0">${node.children.length}</span>
+        <span class="ml-1.5 text-[11px] rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-600 dark:text-zinc-400 shrink-0">${node.children.length}</span>
         ${obsLabel}
       </summary>
       <div>${childrenHtml}</div>

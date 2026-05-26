@@ -36,7 +36,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   data-label-unknown-species={tr.profile.my_observations_unknown_species}
   data-share-obs-base="/share/obs/"
 >
-  <div id="pp-loading" class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+  <div id="pp-loading" class="py-12 text-center text-sm text-zinc-600 dark:text-zinc-400">
     {tr.profile.public_profile_loading}
   </div>
 
@@ -59,13 +59,13 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       </div>
       <div class="min-w-0 flex-1">
         <h1 id="pp-name" class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">—</h1>
-        <p class="text-sm text-zinc-500 dark:text-zinc-500 mt-0.5">
+        <p class="text-sm text-zinc-600 dark:text-zinc-300 mt-0.5">
           <span id="pp-handle">@—</span>
           <span id="pp-region-sep" class="hidden"> · </span>
           <span id="pp-region"></span>
         </p>
         <p id="pp-bio" class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
-        <p id="pp-since" class="mt-2 text-xs text-zinc-500 dark:text-zinc-500"></p>
+        <p id="pp-since" class="mt-2 text-xs text-zinc-600 dark:text-zinc-300"></p>
         <p id="pp-credentialed" class="hidden mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
           ★ {tr.expert.credentialed_badge}
         </p>
@@ -78,15 +78,15 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     <section class="grid grid-cols-3 gap-3 mb-8">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p id="pp-stat-obs" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.total_observations}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{tr.profile.total_observations}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p id="pp-stat-species" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.species_count}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{tr.profile.species_count}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p id="pp-stat-streak" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">—</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.social.streak_current}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{tr.social.streak_current}</p>
       </div>
     </section>
 
@@ -102,7 +102,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         {tr.profile.public_profile_recent}
       </h2>
       <ul id="pp-obs-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></ul>
-      <p id="pp-obs-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+      <p id="pp-obs-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
         {tr.profile.public_profile_no_observations}
       </p>
     </section>
@@ -286,7 +286,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
             <div class="text-xs uppercase tracking-wider mb-1 ${tierClass(b.badges.tier)} inline-block px-1.5 py-0.5 rounded">${b.badges.tier}</div>
             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${name}</p>
-            <p class="text-xs text-zinc-500 capitalize">${b.badges.category}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 capitalize">${b.badges.category}</p>
           </li>`;
         }).join('');
       }
@@ -333,7 +333,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
             </div>
             <div class="p-2">
               <p class="text-xs italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${safeName}</p>
-              <p class="text-[11px] text-zinc-500 truncate">${date}${region ? ' · ' + region : ''}</p>
+              <p class="text-[11px] text-zinc-600 dark:text-zinc-300 truncate">${date}${region ? ' · ' + region : ''}</p>
             </div>
           </a>
         </li>`;

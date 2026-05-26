@@ -28,7 +28,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
   <div class="flex items-center justify-between">
     <div>
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
-      <p class="text-xs text-zinc-500 mt-1">{lang === 'es' ? 'Cada especie que has documentado' : 'Every species you’ve documented'}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-1">{lang === 'es' ? 'Cada especie que has documentado' : 'Every species you’ve documented'}</p>
     </div>
     <div class="flex items-center gap-2">
       {ownerOnly && (

@@ -223,7 +223,7 @@ function keyForm(p: PluginCardProps, t: Strings, hasKey: boolean): string {
   const inputs = p.plugin.keySpec.map((spec) => {
     const current = ''; // value is always empty on render — filled by JS after open
     const hintHtml = spec.hint
-      ? `<p class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(spec.hint)}</p>`
+      ? `<p class="text-[10px] text-zinc-600 dark:text-zinc-400 mt-0.5">${escape(spec.hint)}</p>`
       : '';
     const setupLink = p.plugin.setupSteps?.find((s) => s.link)?.link ?? '';
     const linkHtml = setupLink
@@ -266,7 +266,7 @@ function keyForm(p: PluginCardProps, t: Strings, hasKey: boolean): string {
           <button type="button" data-key-save="${id}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${escape(t.save)}</button>
           ${testBtn}
           <button type="button" data-key-clear="${id}" class="rounded-lg border border-red-300 dark:border-red-900/50 px-2 py-1 text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${escape(t.clear)}</button>
-          <span data-key-status="${id}" class="text-[10px] text-zinc-500 dark:text-zinc-400"></span>
+          <span data-key-status="${id}" class="text-[10px] text-zinc-600 dark:text-zinc-400"></span>
         </div>
       </div>
     </details>
@@ -290,7 +290,7 @@ function sponsorshipLine(p: PluginCardProps, t: Strings): string {
   const usage = p.sponsorship.daily_limit !== null && p.sponsorship.used_today !== null
     ? ` · ${p.sponsorship.used_today} / ${p.sponsorship.daily_limit} ${t.ids_today}`
     : '';
-  return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300 ml-1">${t.via_sponsorship}</span><div class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${t.sponsored_by} ${handle}${usage}</div>`;
+  return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300 ml-1">${t.via_sponsorship}</span><div class="text-[10px] text-zinc-600 dark:text-zinc-400 mt-0.5">${t.sponsored_by} ${handle}${usage}</div>`;
 }
 
 function plantnetQuotaChip(p: PluginCardProps, t: Strings): string {
@@ -306,7 +306,7 @@ export function renderPluginCard(p: PluginCardProps): string {
     : 'rounded-lg border border-zinc-200 dark:border-zinc-800 p-3';
 
   const message = p.state.kind === 'unsupported' && p.state.message
-    ? `<p class="text-[10px] text-zinc-500 italic mt-1">${escape(p.state.message)}</p>`
+    ? `<p class="text-[10px] text-zinc-600 dark:text-zinc-300 italic mt-1">${escape(p.state.message)}</p>`
     : '';
 
   const hasKey = p.plugin.keySpec?.some((s) => !!p.byoKeysSet[s.name]) ?? false;
@@ -323,8 +323,8 @@ export function renderPluginCard(p: PluginCardProps): string {
             ${sponsorshipLine(p, t)}
             ${plantnetQuotaChip(p, t)}
           </div>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.plugin.description)}</p>
-          <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${escape(metaLine(p))}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">${escape(p.plugin.description)}</p>
+          <p class="text-[10px] text-zinc-400 dark:text-zinc-300 mt-1 font-mono">${escape(metaLine(p))}</p>
           ${message}
           ${form}
         </div>
@@ -381,8 +381,8 @@ export function renderLocalDataCard(p: LocalDataCardProps): string {
             ${p.brand ? `<span class="text-base">${escape(p.brand)}</span>` : ''}
             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(p.name)}</p>
           </div>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.description)}</p>
-          <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${escape(status)}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">${escape(p.description)}</p>
+          <p class="text-[10px] text-zinc-400 dark:text-zinc-300 mt-1 font-mono">${escape(status)}</p>
         </div>
         <div class="flex flex-wrap gap-2 flex-none">
           ${downloadBtn}

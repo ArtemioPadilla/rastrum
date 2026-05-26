@@ -42,7 +42,7 @@ const tr = t(lang);
 
   <ul class="watchlist-list space-y-2"></ul>
 
-  <p class="watchlist-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+  <p class="watchlist-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
     {tr.social.no_activity}
   </p>
 </section>
@@ -177,7 +177,7 @@ const tr = t(lang);
               <img src="${avatar}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm text-zinc-800 dark:text-zinc-200 line-clamp-2">${escapeText(summary)}</p>
-                <p class="text-xs text-zinc-500 mt-0.5">${ago}</p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">${ago}</p>
               </div>
             </a>
           </li>`;

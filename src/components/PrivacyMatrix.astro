@@ -64,7 +64,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 <section class="rastrum-privacy-matrix" data-lang={lang}>
   <header class="mb-6">
     <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{pm.heading}</h2>
-    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{pm.subheading}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{pm.subheading}</p>
   </header>
 
   <!-- Presets -->
@@ -89,7 +89,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
   <!-- Live preview (static placeholders for v1.2.0) -->
   <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3" aria-live="polite">
     <article data-preview="anonymous" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">{pm.preview_anonymous}</h3>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-2">{pm.preview_anonymous}</h3>
       <ul class="text-xs space-y-1 text-zinc-700 dark:text-zinc-300">
         <li><span data-preview-row="profile">{pm.facet.profile.label}: <span data-state></span></span></li>
         <li><span data-preview-row="real_name">{pm.facet.real_name.label}: <span data-state></span></span></li>
@@ -98,7 +98,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
       </ul>
     </article>
     <article data-preview="signed_in" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">{pm.preview_signed_in}</h3>
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-2">{pm.preview_signed_in}</h3>
       <ul class="text-xs space-y-1 text-zinc-700 dark:text-zinc-300">
         <li><span data-preview-row="profile">{pm.facet.profile.label}: <span data-state></span></span></li>
         <li><span data-preview-row="real_name">{pm.facet.real_name.label}: <span data-state></span></span></li>
@@ -120,14 +120,14 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
           aria-controls={`pm-section-body-${section.key}`}
         >
           <h3 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">{section.title}</h3>
-          <span class="sm:hidden text-xs text-zinc-500" data-section-chevron>−</span>
+          <span class="sm:hidden text-xs text-zinc-600 dark:text-zinc-300" data-section-chevron>−</span>
         </button>
         <div id={`pm-section-body-${section.key}`} data-section-body class="px-4 pb-3 space-y-3">
           {section.rows.map(facet => (
             <div data-facet-row={facet} class="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 py-2 border-t border-zinc-100 dark:border-zinc-800/60 first:border-t-0">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{pm.facet[facet]?.label ?? facet}</p>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pm.facet[facet]?.description ?? ''}</p>
+                <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{pm.facet[facet]?.description ?? ''}</p>
               </div>
               <div class="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
                 <div role="radiogroup" aria-label={pm.facet[facet]?.label ?? facet} class="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden text-xs font-medium">
@@ -151,8 +151,8 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
                 >
                   {levels.map(level => (
                     <li class="flex items-center gap-1.5" data-key={level.key}>
-                      <span class="text-zinc-500 dark:text-zinc-400">{level.label}</span>
-                      <span data-peer-norm-bar class="text-zinc-400 dark:text-zinc-500 italic">…</span>
+                      <span class="text-zinc-600 dark:text-zinc-400">{level.label}</span>
+                      <span data-peer-norm-bar class="text-zinc-400 dark:text-zinc-300 italic">…</span>
                     </li>
                   ))}
                 </ul>
@@ -373,7 +373,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
         span.textContent = seen ? visible : hidden;
         span.className = seen
           ? 'text-emerald-600 dark:text-emerald-400 font-medium'
-          : 'text-zinc-400 dark:text-zinc-500';
+          : 'text-zinc-400 dark:text-zinc-300';
       });
     });
   }

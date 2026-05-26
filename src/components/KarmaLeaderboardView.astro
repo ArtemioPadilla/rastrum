@@ -239,18 +239,18 @@ const stringsJson = JSON.stringify({
     </div>
   </div>
 
-  <div id="leaderboard-loading" class="text-sm text-zinc-500 italic">
+  <div id="leaderboard-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">
     {cm.loading}
   </div>
 
-  <div id="leaderboard-empty" class="hidden mt-8 text-center text-sm text-zinc-500">
+  <div id="leaderboard-empty" class="hidden mt-8 text-center text-sm text-zinc-600 dark:text-zinc-300">
     {cm.leaderboard_empty}
   </div>
 
   <div id="leaderboard-table-wrap" class="hidden overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+        <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
           <th class="py-2 pr-2 w-12">{cm.leaderboard_rank}</th>
           <th class="py-2 px-2">{cm.leaderboard_observer}</th>
           <th data-col-karma class="py-2 px-2 text-right">{cm.leaderboard_karma}</th>
@@ -574,7 +574,7 @@ const stringsJson = JSON.stringify({
           ${avatarCell}
           <div class="min-w-0">
             <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">@${escapeHtml(handle)}</span>
-            ${row.display_name ? `<span class="block text-xs text-zinc-500 dark:text-zinc-400 truncate">${escapeHtml(row.display_name)}</span>` : ''}
+            ${row.display_name ? `<span class="block text-xs text-zinc-600 dark:text-zinc-400 truncate">${escapeHtml(row.display_name)}</span>` : ''}
           </div>
         </a>
       </td>
@@ -645,7 +645,7 @@ const stringsJson = JSON.stringify({
 
   function showLoading() {
     loadingEl!.classList.remove('hidden', 'text-red-600');
-    loadingEl!.classList.add('text-zinc-500');
+    loadingEl!.classList.add('text-zinc-600 dark:text-zinc-300');
     loadingEl!.textContent = STRINGS.loading;
     emptyEl!.classList.add('hidden');
     tableWrap!.classList.add('hidden');
@@ -976,7 +976,7 @@ const stringsJson = JSON.stringify({
       loadingEl!.classList.remove('hidden');
       loadingEl!.textContent = err instanceof Error ? err.message : String(err);
       loadingEl!.classList.add('text-red-600');
-      loadingEl!.classList.remove('text-zinc-500');
+      loadingEl!.classList.remove('text-zinc-600 dark:text-zinc-300');
     }
   }
 
@@ -1052,7 +1052,7 @@ const stringsJson = JSON.stringify({
       loadingEl!.classList.remove('hidden');
       loadingEl!.textContent = err instanceof Error ? err.message : String(err);
       loadingEl!.classList.add('text-red-600');
-      loadingEl!.classList.remove('text-zinc-500');
+      loadingEl!.classList.remove('text-zinc-600 dark:text-zinc-300');
     }
   }
 

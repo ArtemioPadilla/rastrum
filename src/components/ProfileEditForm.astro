@@ -43,7 +43,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.username}</label>
       <input name="username" type="text" pattern="[a-zA-Z0-9_]{3,30}" maxlength="30" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
-      <p class="mt-1 text-xs text-zinc-500">{tr.profile.username_hint}</p>
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.username_hint}</p>
     </div>
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.display_name}</label>
@@ -69,7 +69,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       <select id="country_code" name="country_code" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
         <option value="">{tr.profile.country_any}</option>
       </select>
-      <p class="mt-1 text-xs text-zinc-500" data-country-hint>{tr.profile.country_hint}</p>
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300" data-country-hint>{tr.profile.country_hint}</p>
       <p class="mt-1 hidden text-xs text-amber-700 dark:text-amber-400" data-country-load-error>{tr.profile.country_load_error}</p>
     </div>
     <div>
@@ -97,7 +97,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
           <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
           <option value="CC0">CC0</option>
         </select>
-        <p class="mt-1 text-xs text-zinc-500">{tr.profile.license_hint}</p>
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.license_hint}</p>
         <ul
           class="mt-2 space-y-1 text-xs"
           aria-label={(tr as unknown as { peer_norms: { aria_label: string } }).peer_norms.aria_label}
@@ -106,15 +106,15 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         >
           <li class="flex items-center justify-between gap-3" data-key="CC BY 4.0">
             <span class="text-zinc-600 dark:text-zinc-400">CC BY 4.0</span>
-            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-300 italic">…</span>
           </li>
           <li class="flex items-center justify-between gap-3" data-key="CC BY-NC 4.0">
             <span class="text-zinc-600 dark:text-zinc-400">CC BY-NC 4.0</span>
-            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-300 italic">…</span>
           </li>
           <li class="flex items-center justify-between gap-3" data-key="CC0">
             <span class="text-zinc-600 dark:text-zinc-400">CC0</span>
-            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-300 italic">…</span>
           </li>
         </ul>
       </div>
@@ -133,11 +133,11 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         <option value="Europe/Madrid">Europe/Madrid</option>
         <option value="Europe/London">Europe/London</option>
       </select>
-      <p class="mt-1 text-xs text-zinc-500">{tr.profile.timezone_description}</p>
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.timezone_description}</p>
     </div>
 
     <fieldset class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-5">
-      <p class="text-xs text-zinc-500 dark:text-zinc-400">
+      <p class="text-xs text-zinc-600 dark:text-zinc-400">
         <a href={`/${lang}/${lang === 'es' ? 'perfil/ajustes' : 'profile/settings'}/privacy/`}
            class="text-emerald-700 dark:text-emerald-400 hover:underline">
           {privacyTr.manage_in_tab_note}
@@ -147,21 +147,21 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         <input type="checkbox" name="gamification_opt_in" class="mt-1" />
         <div>
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.gamification}</p>
-          <p class="text-xs text-zinc-500">{tr.profile.gamification_hint}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.gamification_hint}</p>
         </div>
       </label>
       <label class="flex items-start gap-3 cursor-pointer">
         <input type="checkbox" name="streak_digest_opt_in" class="mt-1" />
         <div>
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.streak_digest}</p>
-          <p class="text-xs text-zinc-500">{tr.profile.streak_digest_hint}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.streak_digest_hint}</p>
         </div>
       </label>
       <label class="flex items-start gap-3 cursor-pointer" id="community-visible-row">
         <input type="checkbox" name="community_visible" class="mt-1" />
         <div>
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.community_visible}</p>
-          <p class="text-xs text-zinc-500" data-helper-on>{tr.profile.community_visible_hint}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-300" data-helper-on>{tr.profile.community_visible_hint}</p>
           <p class="text-xs text-amber-700 dark:text-amber-400 hidden" data-helper-off>{tr.profile.community_visible_disabled}</p>
         </div>
       </label>
@@ -177,7 +177,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         type="date"
         class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
       />
-      <p class="mt-1 text-xs text-zinc-500">
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
         {isEs
           ? 'Sólo el mes y día se usan. Registra una observación en tu cumpleaños para obtener la medalla 🎉'
           : 'Only month and day are used. Log an observation on your birthday to earn the badge 🎉'}
@@ -203,7 +203,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
       {tr.profile.identities_heading}
     </h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">{tr.profile.identities_hint}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{tr.profile.identities_hint}</p>
 
     <div id="identity-list" class="space-y-2 mb-4">
       <p class="text-xs text-zinc-400 italic">{tr.profile.identities_loading}</p>
@@ -232,7 +232,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
       {pip.section_title}
     </h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">{pip.section_hint}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{pip.section_hint}</p>
 
     <!-- ▶ Quick setup banner — shown until at least one non-PlantNet identifier is ready -->
     <div id="quick-setup-banner" class="mb-6 rounded-xl border border-emerald-300 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-900/10 p-4">
@@ -260,12 +260,12 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       <div class="mt-3 flex items-center justify-center gap-2 flex-wrap text-xs p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
         <div class="rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1.5 text-center">
           <div class="font-semibold text-emerald-800 dark:text-emerald-300">{lang === 'es' ? 'Modelos especializados' : 'Specialized models'}</div>
-          <div class="text-[10px] text-zinc-500">PlantNet · BirdNET · EfficientNet</div>
+          <div class="text-[10px] text-zinc-600 dark:text-zinc-300">PlantNet · BirdNET · EfficientNet</div>
         </div>
         <svg class="w-4 h-4 text-zinc-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
         <div class="rounded border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 px-2 py-1.5 text-center">
           <div class="font-semibold text-sky-800 dark:text-sky-300">{lang === 'es' ? 'Intérprete LLM' : 'LLM interpreter'}</div>
-          <div class="text-[10px] text-zinc-500">Claude / Phi</div>
+          <div class="text-[10px] text-zinc-600 dark:text-zinc-300">Claude / Phi</div>
         </div>
         <svg class="w-4 h-4 text-zinc-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
         <div class="rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2 py-1.5 text-center">
@@ -275,7 +275,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     </details>
 
     <!-- Pipeline flow visualization (active identifiers) -->
-    <div id="pipeline-flow" class="mb-4 flex items-center gap-1 flex-wrap text-xs text-zinc-500">
+    <div id="pipeline-flow" class="mb-4 flex items-center gap-1 flex-wrap text-xs text-zinc-600 dark:text-zinc-300">
       <span class="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">{pip.flow_title}:</span>
       <span id="pipeline-flow-items" class="italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</span>
     </div>
@@ -288,7 +288,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       <div class="mt-3">
     <div class="mb-6">
       <ul id="identifier-list" class="space-y-2">
-        <li class="text-sm text-zinc-500 italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</li>
+        <li class="text-sm text-zinc-600 dark:text-zinc-300 italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</li>
       </ul>
     </div>
       </div>
@@ -335,7 +335,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         <span data-pk-label>{tr.auth.register_passkey}</span>
       </button>
       <p id="passkey-msg" class="hidden text-sm"></p>
-      <p id="passkey-unsupported" class="hidden text-xs text-zinc-500 italic">{tr.auth.passkey_unavailable}</p>
+      <p id="passkey-unsupported" class="hidden text-xs text-zinc-600 dark:text-zinc-300 italic">{tr.auth.passkey_unavailable}</p>
 
       <div class="pt-2">
         <button id="signout-all-btn" type="button" class="text-sm text-red-600 dark:text-red-400 hover:underline disabled:opacity-50">
@@ -363,7 +363,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             {isEs ? "Formulario clásico de observación" : "Classic observation form"}
           </p>
-          <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+          <p class="text-xs text-zinc-400 dark:text-zinc-300 mt-0.5">
             {isEs
               ? "Accede al formulario original con todos los controles visibles."
               : "Access the original form with all controls visible."}
@@ -1559,7 +1559,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         return `<span class="inline-flex items-center gap-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 font-medium">${label}${badge}</span>`;
       }).join(`<span class="text-zinc-400">${arrow}</span>`);
       const icon = sortKey === 'photo' ? '📷' : '🔊';
-      return `<div class="flex items-center gap-1.5 flex-wrap"><span class="text-zinc-500 text-[10px]">${icon}</span>${chips}</div>`;
+      return `<div class="flex items-center gap-1.5 flex-wrap"><span class="text-zinc-600 dark:text-zinc-300 text-[10px]">${icon}</span>${chips}</div>`;
     };
     flowItems.innerHTML = `<div class="flex flex-col gap-1.5">${renderRow('photo')}${renderRow('audio')}</div>`;
   }
@@ -1796,7 +1796,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         if (id === 'claude_haiku') {
           if (statusEl) {
             statusEl.textContent = 'Validating…';
-            statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+            statusEl.className = 'text-[10px] text-zinc-600 dark:text-zinc-400';
           }
           const { validateAnthropicKey } = await import('../lib/anthropic-key');
           const result = await validateAnthropicKey(value);
@@ -1834,7 +1834,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         const statusEl = list.querySelector<HTMLElement>(`[data-key-status="${CSS.escape(id)}"]`);
         if (statusEl) {
           statusEl.textContent = 'Testing…';
-          statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+          statusEl.className = 'text-[10px] text-zinc-600 dark:text-zinc-400';
         }
         const result = await plugin.testConnection();
         if (statusEl) {
@@ -1913,7 +1913,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         <div class="flex items-start justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2" data-identity-provider="${id.provider}">
           <div>
             <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${PROVIDERS_LABEL[id.provider] ?? id.provider}</span>
-            ${id.email ? `<span class="ml-2 text-xs text-zinc-500">${id.email}</span>` : ''}
+            ${id.email ? `<span class="ml-2 text-xs text-zinc-600 dark:text-zinc-300">${id.email}</span>` : ''}
             <div class="text-xs text-zinc-400">Added ${fmtDate(id.created_at)} \u00b7 Last sign-in ${fmtDate(id.last_sign_in_at)}</div>
           </div>
           ${identities.length > 1 ? `<button data-unlink-provider="${id.provider}" class="ml-4 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0.5 shrink-0">Remove</button>` : ''}

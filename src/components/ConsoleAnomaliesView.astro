@@ -38,7 +38,7 @@ const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
   data-label-acknowledged={labelAcknowledged}
 >
   <h1 class="text-xl font-semibold mb-1">{aTitle}</h1>
-  <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{aDesc}</p>
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{aDesc}</p>
 
   <div id="anomalies-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
     {tr.console.not_authorized}
@@ -56,13 +56,13 @@ const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
       </div>
     </div>
 
-    <div id="anomalies-loading" class="text-sm text-zinc-500 italic">{c.loading}</div>
-    <div id="anomalies-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+    <div id="anomalies-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{c.loading}</div>
+    <div id="anomalies-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
       {aEmpty}
     </div>
     <div id="anomalies-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
       <table class="min-w-full text-sm">
-        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
           <tr>
             <th class="px-3 py-2">{aCols.kind ?? 'Kind'}</th>
             <th class="px-3 py-2">{aCols.actor ?? 'Actor'}</th>
@@ -181,9 +181,9 @@ const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
         <tr class="${acked ? 'opacity-60' : ''}">
           <td class="px-3 py-2">${kindPill(r.kind)}</td>
           <td class="px-3 py-2 text-zinc-700 dark:text-zinc-300">${esc(actorLabel(r.actor_id))}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtRange(r.window_start, r.window_end))}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300">${esc(fmtRange(r.window_start, r.window_end))}</td>
           <td class="px-3 py-2 text-right tabular-nums">${r.event_count}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[260px] truncate" title="${esc(detailsJson)}">${esc(detailsJson || '')}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300 max-w-[260px] truncate" title="${esc(detailsJson)}">${esc(detailsJson || '')}</td>
           <td class="px-3 py-2 text-right">
             ${acked
               ? `<span class="text-[11px] text-emerald-600 dark:text-emerald-400">${esc(labelAcknowledged)}</span>`

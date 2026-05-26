@@ -80,7 +80,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
             class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             placeholder={profileTree.appeal_message_placeholder}
           ></textarea>
-          <p class="mt-1 text-xs text-zinc-500">{profileTree.appeal_message_hint}</p>
+          <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{profileTree.appeal_message_hint}</p>
         </div>
 
         <button
@@ -104,7 +104,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
         {profileTree.appeal_history_heading}
       </h2>
       <ul id="appeal-history-list" class="space-y-3"></ul>
-      <p id="appeal-history-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
+      <p id="appeal-history-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-400">
         {profileTree.appeal_history_empty}
       </p>
     </section>
@@ -204,11 +204,11 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
         historyList.innerHTML = rows.map(a => `
           <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 text-sm space-y-1">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-xs text-zinc-500">${escapeText(new Date(a.created_at).toLocaleDateString(lang === 'es' ? 'es' : 'en', { dateStyle: 'medium' }))}</span>
+              <span class="text-xs text-zinc-600 dark:text-zinc-300">${escapeText(new Date(a.created_at).toLocaleDateString(lang === 'es' ? 'es' : 'en', { dateStyle: 'medium' }))}</span>
               ${statusPill(a.status)}
             </div>
             <p class="text-zinc-800 dark:text-zinc-200 line-clamp-3">${escapeText(a.message)}</p>
-            ${a.reviewer_note ? `<p class="text-zinc-500 italic text-xs">${escapeText(a.reviewer_note)}</p>` : ''}
+            ${a.reviewer_note ? `<p class="text-zinc-600 dark:text-zinc-300 italic text-xs">${escapeText(a.reviewer_note)}</p>` : ''}
           </li>
         `).join('');
       }

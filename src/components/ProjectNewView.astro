@@ -32,7 +32,7 @@ const projectsBase = routes.projects[lang];
         pattern="^[a-z0-9][a-z0-9-]{1,63}$"
         class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm font-mono"
       />
-      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{proj.form_slug_hint}</p>
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{proj.form_slug_hint}</p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -76,7 +76,7 @@ const projectsBase = routes.projects[lang];
         class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-xs font-mono"
         placeholder='{"type":"Polygon","coordinates":[[[-96.7,17.0],[-96.6,17.0],[-96.6,17.1],[-96.7,17.1],[-96.7,17.0]]]}'
       ></textarea>
-      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{proj.form_polygon_hint}</p>
+      <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{proj.form_polygon_hint}</p>
       <div class="mt-2 flex flex-wrap items-center gap-3">
         <label class="inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 cursor-pointer hover:underline">
           <input type="file" id="project-polygon-file" accept=".geojson,application/geo+json,application/json" class="hidden" />

@@ -25,7 +25,7 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
 
 <section class="max-w-6xl">
   <h1 class="text-xl font-semibold mb-1">{fTitle}</h1>
-  <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{fDesc}</p>
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{fDesc}</p>
 
   <div id="forensics-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
     {tr.console.not_authorized}
@@ -75,13 +75,13 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
       </div>
     </form>
 
-    <div id="forensics-loading" class="hidden text-sm text-zinc-500 italic">{c.loading}</div>
-    <div id="forensics-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+    <div id="forensics-loading" class="hidden text-sm text-zinc-600 dark:text-zinc-300 italic">{c.loading}</div>
+    <div id="forensics-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-300">
       {fEmpty}
     </div>
     <div id="forensics-results" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
       <table class="min-w-full text-sm">
-        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
           <tr>
             <th class="px-3 py-2">{fCols.id ?? 'id'}</th>
             <th class="px-3 py-2">{fCols.timestamp ?? 'timestamp'}</th>
@@ -218,12 +218,12 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
       const detailsJson = r.details ? JSON.stringify(r.details) : '';
       return `
         <tr>
-          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${r.id}</td>
-          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${esc(r.created_at)}</td>
-          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${esc((r.actor_id ?? '').slice(0, 8))}…</td>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-300">${r.id}</td>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-300">${esc(r.created_at)}</td>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-300">${esc((r.actor_id ?? '').slice(0, 8))}…</td>
           <td class="px-3 py-2"><code class="text-xs">${esc(r.op)}</code></td>
           <td class="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">${esc(r.target_type ?? '')}/${esc(r.target_id ?? '')}</td>
-          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[320px] truncate" title="${esc(detailsJson)}">${esc(detailsJson)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-300 max-w-[320px] truncate" title="${esc(detailsJson)}">${esc(detailsJson)}</td>
         </tr>
       `;
     }).join('');

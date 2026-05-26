@@ -137,7 +137,7 @@ const labels = {
     {
       key: 'created_at',
       label: 'Created',
-      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-600 dark:text-zinc-300',
       render: r => escapeHtml(fmtTs(r.created_at)),
     },
     {
@@ -192,7 +192,7 @@ const labels = {
       ${desc ? `<p class="text-[11px] text-zinc-700 dark:text-zinc-300">${escapeHtml(desc)}</p>` : ''}
       <div class="flex flex-wrap gap-2">
         <a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-700 px-2 py-0.5 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-900">${escapeHtml(labelDrillView)} →</a>
-        <span class="inline-flex items-center rounded border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500" data-prj-obs-count="${escapeHtml(r.id)}">${escapeHtml(labelDrillObs)}: …</span>
+        <span class="inline-flex items-center rounded border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-600 dark:text-zinc-300" data-prj-obs-count="${escapeHtml(r.id)}">${escapeHtml(labelDrillObs)}: …</span>
       </div>
       <details class="rounded border border-zinc-200 dark:border-zinc-800">
         <summary class="px-2 py-1 text-[11px] cursor-pointer text-zinc-700 dark:text-zinc-300">GeoJSON</summary>
