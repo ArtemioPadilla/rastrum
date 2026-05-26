@@ -95,7 +95,7 @@ function buildHelpOverlay(labels: Record<string, string>): HTMLElement {
   const navSection = document.createElement('div');
   navSection.className = 'mb-4';
   const navHeading = document.createElement('p');
-  navHeading.className = 'text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2';
+  navHeading.className = 'text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2';
   navHeading.textContent = labels['kb_help_navigation'] ?? 'Navigation';
   navSection.appendChild(navHeading);
 
@@ -124,7 +124,7 @@ function buildHelpOverlay(labels: Record<string, string>): HTMLElement {
   const actionsSection = document.createElement('div');
   actionsSection.className = 'mb-4';
   const actHeading = document.createElement('p');
-  actHeading.className = 'text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2';
+  actHeading.className = 'text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2';
   actHeading.textContent = labels['kb_help_actions'] ?? 'Actions';
   actionsSection.appendChild(actHeading);
 

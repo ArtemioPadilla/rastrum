@@ -27,8 +27,8 @@ const retryLabel   = profileStrings.my_observations_retry ?? (lang === 'es' ? 'R
 >
   <a href={obsListPath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">← {tr.profile.my_observations_title}</a>
 
-  <div id="local-obs-loading" class="mt-6 text-sm text-zinc-500">{lang === 'es' ? 'Cargando…' : 'Loading…'}</div>
-  <div id="local-obs-not-found" class="hidden mt-6 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-zinc-500 text-center">
+  <div id="local-obs-loading" class="mt-6 text-sm text-zinc-600 dark:text-zinc-300">{lang === 'es' ? 'Cargando…' : 'Loading…'}</div>
+  <div id="local-obs-not-found" class="hidden mt-6 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-zinc-600 dark:text-zinc-300 text-center">
     {lang === 'es' ? 'No encontramos esa observación en este dispositivo.' : "We couldn't find that observation on this device."}
   </div>
 

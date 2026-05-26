@@ -83,11 +83,11 @@ const tr = t(lang);
 
     <!-- Active filter pills -->
     <div id="audit-active-pills" class="hidden flex flex-wrap gap-1.5 items-center">
-      <span class="text-xs text-zinc-500">{tr.console.audit_active_filters}</span>
+      <span class="text-xs text-zinc-600 dark:text-zinc-300">{tr.console.audit_active_filters}</span>
     </div>
   </div>
 
-  <div id="audit-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+  <div id="audit-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
   <div id="audit-rows" class="hidden space-y-2"></div>
   <p id="audit-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
@@ -251,7 +251,7 @@ const tr = t(lang);
     const wrap = document.getElementById('audit-rows')!;
 
     if (rows.length === 0) {
-      wrap.innerHTML = '<div class="rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">No audit entries match the current filters.</div>';
+      wrap.innerHTML = '<div class="rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">No audit entries match the current filters.</div>';
       show('audit-rows');
       return;
     }
@@ -259,10 +259,10 @@ const tr = t(lang);
     wrap.innerHTML = rows.map(r => `
       <details class="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
         <summary class="flex justify-between cursor-pointer">
-          <span><span class="font-mono text-xs text-zinc-500">${escapeHtml(r.created_at)}</span>
+          <span><span class="font-mono text-xs text-zinc-600 dark:text-zinc-300">${escapeHtml(r.created_at)}</span>
                 <span class="ml-2 font-semibold">${escapeHtml(r.op)}</span>
                 <span class="ml-2 text-zinc-600 dark:text-zinc-400">${escapeHtml(r.target_type ?? '')}/${escapeHtml(r.target_id ?? '')}</span></span>
-          <span class="text-xs text-zinc-500">#${r.id}</span>
+          <span class="text-xs text-zinc-600 dark:text-zinc-300">#${r.id}</span>
         </summary>
         <div class="mt-2 text-xs text-zinc-700 dark:text-zinc-300">
           <div class="mb-1"><strong>Reason:</strong> ${escapeHtml(r.reason)}</div>
@@ -295,7 +295,7 @@ const tr = t(lang);
     const existingSpan = pillsContainer.querySelector('span');
     const labelHtml = existingSpan ? existingSpan.outerHTML : '';
 
-    pillsContainer.innerHTML = `<span class="text-xs text-zinc-500">${escapeHtml(labelActivePills)}</span>` +
+    pillsContainer.innerHTML = `<span class="text-xs text-zinc-600 dark:text-zinc-300">${escapeHtml(labelActivePills)}</span>` +
       pills.map(p => `
         <button data-remove-filter="${escapeHtml(p.key)}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/50">
           ${escapeHtml(p.label)}

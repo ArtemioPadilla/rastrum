@@ -19,12 +19,12 @@ const isEs = lang === 'es';
         <option value="">{isEs ? 'Todos' : 'All'}</option>
       </select>
     </div>
-    <div id="ea-loading" class="text-sm text-zinc-500 italic">{isEs ? 'Cargando...' : 'Loading...'}</div>
-    <div id="ea-empty" class="hidden text-sm text-zinc-500">{c.expert_apps_empty}</div>
+    <div id="ea-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{isEs ? 'Cargando...' : 'Loading...'}</div>
+    <div id="ea-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-300">{c.expert_apps_empty}</div>
     <div id="ea-list" class="hidden space-y-2"></div>
     <nav id="ea-pager" class="hidden flex items-center justify-between text-sm">
       <button id="ea-prev" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">←</button>
-      <span id="ea-page" class="text-zinc-500"></span>
+      <span id="ea-page" class="text-zinc-600 dark:text-zinc-300"></span>
       <button id="ea-next" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">→</button>
     </nav>
     <!-- Slide-over -->
@@ -36,15 +36,15 @@ const isEs = lang === 'es';
           <button id="ea-close" class="text-zinc-400 hover:text-zinc-600 text-xl" aria-label="Close">&times;</button>
         </div>
         <dl class="space-y-3 text-sm">
-          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Estado' : 'Status'}</dt><dd id="ea-detail-status" class="mt-0.5"></dd></div>
-          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Solicitante' : 'Applicant'}</dt><dd id="ea-detail-user" class="mt-0.5 font-mono text-xs break-all"></dd></div>
-          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Enviado' : 'Submitted'}</dt><dd id="ea-detail-date" class="mt-0.5"></dd></div>
-          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_taxa}</dt><dd id="ea-detail-taxa" class="mt-0.5"></dd></div>
-          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_rationale}</dt><dd id="ea-detail-rationale" class="mt-0.5 whitespace-pre-wrap"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{isEs ? 'Estado' : 'Status'}</dt><dd id="ea-detail-status" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{isEs ? 'Solicitante' : 'Applicant'}</dt><dd id="ea-detail-user" class="mt-0.5 font-mono text-xs break-all"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{isEs ? 'Enviado' : 'Submitted'}</dt><dd id="ea-detail-date" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{c.expert_apps_taxa}</dt><dd id="ea-detail-taxa" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{c.expert_apps_rationale}</dt><dd id="ea-detail-rationale" class="mt-0.5 whitespace-pre-wrap"></dd></div>
         </dl>
         <div id="ea-action-section" class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-4">
           <div>
-            <label for="ea-note" class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_reviewer_note}</label>
+            <label for="ea-note" class="text-xs font-medium text-zinc-600 dark:text-zinc-300 uppercase">{c.expert_apps_reviewer_note}</label>
             <p class="text-[10px] text-zinc-400">{c.expert_apps_reviewer_note_required}</p>
             <textarea id="ea-note" rows="3" class="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
           </div>
@@ -81,7 +81,7 @@ const isEs = lang === 'es';
 
   function statusPill(s: string): string {
     const cls: Record<string, string> = { pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300', approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', rejected: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' };
-    return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600'}">${escapeHtml(s)}</span>`;
+    return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600 dark:text-zinc-300'}">${escapeHtml(s)}</span>`;
   }
 
   async function load(): Promise<void> {
@@ -99,7 +99,7 @@ const isEs = lang === 'es';
     listEl.innerHTML = cachedRows.map(r => {
       const taxa = (r.taxa as string[] ?? []).join(', ');
       const date = new Date(r.created_at as string).toLocaleDateString();
-      return `<button type="button" data-id="${escapeHtml(r.id as string)}" class="ea-row w-full text-left rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors flex items-center justify-between gap-2"><div class="min-w-0"><p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml((r.user_id as string).slice(0, 8))}…</p><p class="text-xs text-zinc-500 truncate">${escapeHtml(taxa)} · ${escapeHtml(date)}</p></div>${statusPill(r.status as string)}</button>`;
+      return `<button type="button" data-id="${escapeHtml(r.id as string)}" class="ea-row w-full text-left rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors flex items-center justify-between gap-2"><div class="min-w-0"><p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml((r.user_id as string).slice(0, 8))}…</p><p class="text-xs text-zinc-600 truncate">${escapeHtml(taxa)} · ${escapeHtml(date)}</p></div>${statusPill(r.status as string)}</button>`;
     }).join('');
     listEl.classList.remove('hidden');
     const total = count ?? 0; const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

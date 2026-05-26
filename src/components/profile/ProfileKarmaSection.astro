@@ -71,7 +71,7 @@ const stringsJson = JSON.stringify({
 
   <div class="flex items-baseline gap-3 mb-2">
     <span data-karma-total class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">—</span>
-    <span class="text-xs text-zinc-500 dark:text-zinc-400">{k.total_label ?? 'karma'}</span>
+    <span class="text-xs text-zinc-600 dark:text-zinc-400">{k.total_label ?? 'karma'}</span>
   </div>
 
   {showBreakdownAffordance && (
@@ -86,7 +86,7 @@ const stringsJson = JSON.stringify({
       {k.expertise_heading ?? (lang === 'es' ? 'Experiencia destacada' : 'Top expertise')}
     </h3>
     <ul data-expertise class="space-y-1 text-sm">
-      <li class="text-xs text-zinc-500 italic">{k.expertise_empty ?? '…'}</li>
+      <li class="text-xs text-zinc-600 dark:text-zinc-300 italic">{k.expertise_empty ?? '…'}</li>
     </ul>
   </div>
 
@@ -107,7 +107,7 @@ const stringsJson = JSON.stringify({
         hidden
         class="mt-2 space-y-1 text-sm"
       >
-        <p data-karma-breakdown-status class="text-xs text-zinc-500 italic">{k.breakdown_loading ?? 'Loading breakdown…'}</p>
+        <p data-karma-breakdown-status class="text-xs text-zinc-600 dark:text-zinc-300 italic">{k.breakdown_loading ?? 'Loading breakdown…'}</p>
         <ul data-karma-breakdown-rows class="hidden space-y-1"></ul>
       </div>
     </div>
@@ -254,7 +254,7 @@ const stringsJson = JSON.stringify({
           return `<li class="flex items-center gap-2 text-xs">
             <span class="text-zinc-700 dark:text-zinc-200">${escAttr(label)}</span>
             <span class="text-zinc-400">·</span>
-            <span class="text-zinc-500">${escAttr(count)}</span>
+            <span class="text-zinc-600 dark:text-zinc-300">${escAttr(count)}</span>
             <span class="ml-auto font-mono ${deltaClass}">${escAttr(delta)}</span>
           </li>`;
         })

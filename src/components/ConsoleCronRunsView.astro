@@ -14,16 +14,16 @@ const tr = t(lang);
   </div>
 
   <div id="cron-shell" class="hidden space-y-4">
-    <div id="cron-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+    <div id="cron-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
 
-    <div id="cron-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+    <div id="cron-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
       No cron jobs found. Check that pg_cron is enabled and rastrum jobs are scheduled.
     </div>
 
     <div id="cron-table-wrap" class="hidden overflow-x-auto">
       <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
         <thead>
-          <tr class="text-left text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
+          <tr class="text-left text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
             <th class="px-3 py-2 font-medium">{tr.console.cron_col_jobname}</th>
             <th class="px-3 py-2 font-medium">{tr.console.cron_col_schedule}</th>
             <th class="px-3 py-2 font-medium">{tr.console.cron_col_last_run}</th>
@@ -134,8 +134,8 @@ const tr = t(lang);
     tbody.innerHTML = rows.map(r => `
       <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
         <td class="px-3 py-2 text-xs font-mono">${escHtml(r.jobname)}</td>
-        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.schedule ?? '—')}</td>
-        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${r.last_run_at ? escHtml(new Date(r.last_run_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
+        <td class="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-300">${escHtml(r.schedule ?? '—')}</td>
+        <td class="px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-300">${r.last_run_at ? escHtml(new Date(r.last_run_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
         <td class="px-3 py-2">${statusBadge(r.last_status)}</td>
         <td class="px-3 py-2 text-xs text-right font-mono">${escHtml(formatDuration(r.last_duration_ms))}</td>
         <td class="px-3 py-2 text-xs text-right">${r.runs_today}</td>

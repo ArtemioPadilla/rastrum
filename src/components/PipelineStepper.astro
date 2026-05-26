@@ -72,13 +72,13 @@ const labels = {
         </button>
 
         <!-- Step label -->
-        <span class="mt-1.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 step-label">
+        <span class="mt-1.5 text-[11px] font-medium text-zinc-600 dark:text-zinc-400 step-label">
           {labels[stepId as keyof typeof labels] as string}
         </span>
 
         <!-- Time estimate (shown when running) -->
         <span
-          class="hidden mt-0.5 text-[10px] text-zinc-400 dark:text-zinc-500 step-estimate"
+          class="hidden mt-0.5 text-[10px] text-zinc-400 dark:text-zinc-300 step-estimate"
           data-step-estimate={stepId}
           aria-live="polite"
         ></span>
@@ -97,7 +97,7 @@ const labels = {
   <!-- Status line below stepper -->
   <p
     id="ps-status-line"
-    class="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400"
+    class="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400"
     aria-live="polite"
     aria-atomic="true"
   ></p>

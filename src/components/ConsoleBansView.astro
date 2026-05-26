@@ -17,7 +17,7 @@ const tr = t(lang);
   </div>
 
   <div id="bans-shell" class="hidden">
-    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{tr.console.bans_intro}</p>
+    <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.bans_intro}</p>
 
     <!-- Top row: filter toggle + issue ban -->
     <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -38,8 +38,8 @@ const tr = t(lang);
     <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-230px)]">
       <!-- Left: ban list -->
       <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-        <div id="bans-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.bans_loading}</div>
-        <div id="bans-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.bans_empty}</div>
+        <div id="bans-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.bans_loading}</div>
+        <div id="bans-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{tr.console.bans_empty}</div>
         <ul id="bans-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
       </aside>
 
@@ -49,25 +49,25 @@ const tr = t(lang);
       </div>
       <div id="bans-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <dt class="text-zinc-500">{tr.console.bans_col_user}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bans_col_user}</dt>
           <dd id="bans-detail-user" class="font-medium text-zinc-800 dark:text-zinc-200 text-xs break-all"></dd>
 
-          <dt class="text-zinc-500">{tr.console.bans_col_reason}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bans_col_reason}</dt>
           <dd id="bans-detail-reason" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.bans_col_expires}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bans_col_expires}</dt>
           <dd id="bans-detail-expires" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
 
-          <dt class="text-zinc-500">{tr.console.bans_col_banned_by}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bans_col_banned_by}</dt>
           <dd id="bans-detail-banned-by" class="font-medium text-zinc-800 dark:text-zinc-200 text-xs break-all"></dd>
 
-          <dt class="text-zinc-500">{tr.console.bans_col_created}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bans_col_created}</dt>
           <dd id="bans-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
         </dl>
 
         <div id="bans-detail-revoked-row" class="hidden space-y-1 text-sm">
-          <p><span class="text-zinc-500">{tr.console.bans_revoked_label}:</span> <span id="bans-detail-revoked-at" class="font-medium text-zinc-800 dark:text-zinc-200"></span></p>
-          <p id="bans-detail-revoke-reason-row" class="hidden"><span class="text-zinc-500">{tr.console.bans_revoke_reason_label}:</span> <span id="bans-detail-revoke-reason" class="text-zinc-700 dark:text-zinc-300 italic"></span></p>
+          <p><span class="text-zinc-600">{tr.console.bans_revoked_label}:</span> <span id="bans-detail-revoked-at" class="font-medium text-zinc-800 dark:text-zinc-200"></span></p>
+          <p id="bans-detail-revoke-reason-row" class="hidden"><span class="text-zinc-600">{tr.console.bans_revoke_reason_label}:</span> <span id="bans-detail-revoke-reason" class="text-zinc-700 dark:text-zinc-300 italic"></span></p>
         </div>
 
         <!-- Action chip: unban -->
@@ -213,11 +213,11 @@ const tr = t(lang);
       const isSelected = b.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
       const activeChip = !b.revoked_at
         ? `<span class="inline-block text-[9px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 py-0.5">active</span>`
-        : `<span class="inline-block text-[9px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-1 py-0.5">lifted</span>`;
+        : `<span class="inline-block text-[9px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-1 py-0.5">lifted</span>`;
       return `<li data-ban-id="${escHtml(b.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="flex items-center gap-1 mb-0.5">${activeChip}</div>
         <div class="text-sm text-zinc-800 dark:text-zinc-200 truncate">${escHtml(b.user_id.slice(0, 8))}…</div>
-        <div class="text-xs text-zinc-500 truncate">${escHtml(b.reason.slice(0, 60))}</div>
+        <div class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escHtml(b.reason.slice(0, 60))}</div>
         <div class="text-xs text-zinc-400">${escHtml(fmtDate(b.created_at))}</div>
       </li>`;
     }).join('');

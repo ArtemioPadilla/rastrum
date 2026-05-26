@@ -162,6 +162,7 @@ docs/
 - **No `console.log` in shipped code.** `console.warn` for genuinely
   exceptional ignored errors only.
 - **Below-fold images use `loading="lazy"`.** The hero / first-paint image stays default-loaded for LCP; everything below the fold (doc screenshots, observation thumbnails, profile avatars in lists) gets `loading="lazy"`.
+- **Body copy minimum contrast = `text-zinc-600` / `dark:text-zinc-300` (4.5:1, WCAG AA).** `text-zinc-500` over white is ~3.2:1 and fails. `dark:text-zinc-500` over `bg-zinc-900` is ~3.5:1 and also fails. Regression-guarded by `tests/unit/color-contrast-policy.test.ts` (PBI 3.1).
 
 ### Astro JSX gotcha — `Record<…>` is parsed as a tag
 Inline TypeScript casts like `(foo as Record<string, unknown>).bar` inside

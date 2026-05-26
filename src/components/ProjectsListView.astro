@@ -32,18 +32,18 @@ const projectsBase = routes.projects[lang];
 
   <section class="space-y-8">
     <div data-section="my">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-2">
         {proj.list_my}
       </h2>
       <div id="projects-mine" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-      <p id="projects-mine-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">{proj.empty_mine}</p>
+      <p id="projects-mine-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-400">{proj.empty_mine}</p>
     </div>
     <div data-section="public">
-      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-2">
         {proj.list_public}
       </h2>
       <div id="projects-public" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-      <p id="projects-public-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">{proj.empty_public}</p>
+      <p id="projects-public-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-400">{proj.empty_public}</p>
     </div>
   </section>
 </section>
@@ -112,8 +112,8 @@ const projectsBase = routes.projects[lang];
             <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml(label)}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider ${visClass}">${visText}</span>
           </div>
-          <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 font-mono">${escapeHtml(r.slug)}</div>
-          <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">${area} km²</div>
+          <div class="mt-1 text-xs text-zinc-600 dark:text-zinc-400 font-mono">${escapeHtml(r.slug)}</div>
+          <div class="mt-2 text-xs text-zinc-600 dark:text-zinc-400">${area} km²</div>
         </a>
       `;
     }

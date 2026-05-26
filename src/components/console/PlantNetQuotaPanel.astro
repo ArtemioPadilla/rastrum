@@ -53,16 +53,16 @@ const loadingText = (tr.console as unknown as Record<string, string>).loading
 >
   <header>
     <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400">{description}</p>
   </header>
 
   <div id="pnq-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
     {notAuth}
   </div>
 
-  <div id="pnq-loading" class="text-sm text-zinc-500 italic">{loadingText}</div>
+  <div id="pnq-loading" class="text-sm text-zinc-600 dark:text-zinc-300 italic">{loadingText}</div>
 
-  <div id="pnq-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+  <div id="pnq-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
     {noData}
   </div>
 
@@ -78,13 +78,13 @@ const loadingText = (tr.console as unknown as Record<string, string>).loading
     <!-- Today's usage gauge -->
     <div class="space-y-2">
       <div class="flex items-baseline justify-between">
-        <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{todayLabel}</span>
+        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">{todayLabel}</span>
         <span id="pnq-fraction" class="text-sm font-mono font-semibold text-zinc-900 dark:text-zinc-100"></span>
       </div>
       <div class="rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 h-3 w-full">
         <div id="pnq-bar" class="h-3 rounded-full transition-all duration-500" style="width:0%"></div>
       </div>
-      <div class="flex justify-between text-[11px] text-zinc-500">
+      <div class="flex justify-between text-[11px] text-zinc-600 dark:text-zinc-300">
         <span id="pnq-pct"></span>
         <span id="pnq-remain"></span>
       </div>
@@ -92,7 +92,7 @@ const loadingText = (tr.console as unknown as Record<string, string>).loading
 
     <!-- 7-day trend bar chart -->
     <div>
-      <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">{trendLabel}</p>
+      <p class="text-xs font-medium text-zinc-600 dark:text-zinc-400 uppercase tracking-wide mb-2">{trendLabel}</p>
       <div id="pnq-trend" class="flex items-end gap-1 h-16"></div>
     </div>
   </div>

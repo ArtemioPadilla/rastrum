@@ -30,7 +30,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       {tr.chat.clear}
     </button>
   </div>
-  <p class="text-sm text-zinc-500 mb-4">{tr.chat.subtitle}</p>
+  <p class="text-sm text-zinc-600 dark:text-zinc-300 mb-4">{tr.chat.subtitle}</p>
 
   <!-- Consent / setup gate -->
   <div id="chat-consent" class="hidden rounded-xl border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-4 mb-4">
@@ -71,7 +71,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
             {lang === 'es' ? 'Más ligero' : 'Lighter'}
           </span>
         </span>
-        <span class="text-[11px] font-normal text-zinc-500 mt-0.5">
+        <span class="text-[11px] font-normal text-zinc-600 dark:text-zinc-300 mt-0.5">
           <span data-cdl>{lang === 'es' ? '~880 MB · más pequeño · solo texto' : '~880 MB · smaller · text only'}</span>
         </span>
       </button>
@@ -321,24 +321,24 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         const pct = Math.round((e.result.confidence ?? 0) * 100);
         const sci = e.result.scientific_name
           ? `<span class="italic">${escapeHtml(e.result.scientific_name)}</span>`
-          : `<span class="text-zinc-500">${escapeHtml(i18nGet('compare-no-id'))}</span>`;
+          : `<span class="text-zinc-600 dark:text-zinc-300">${escapeHtml(i18nGet('compare-no-id'))}</span>`;
         return `
           <li class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5">
-            <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">${escapeHtml(e.name)}</p>
-            <p class="text-xs">${sci} <span class="text-[10px] text-zinc-500">${pct}%</span></p>
+            <p class="text-[10px] uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-0.5">${escapeHtml(e.name)}</p>
+            <p class="text-xs">${sci} <span class="text-[10px] text-zinc-600 dark:text-zinc-300">${pct}%</span></p>
           </li>
         `;
       }
       return `
         <li class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 px-2 py-1.5 opacity-70">
-          <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">${escapeHtml(e.name)}</p>
+          <p class="text-[10px] uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-0.5">${escapeHtml(e.name)}</p>
           <p class="text-[11px] text-zinc-600 dark:text-zinc-400">${escapeHtml(e.error ?? i18nGet('compare-unavailable'))}</p>
         </li>
       `;
     }).join('');
     return `
       <div class="mt-2" data-compare="${idx}">
-        <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">${escapeHtml(heading)}</p>
+        <p class="text-[10px] uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-1">${escapeHtml(heading)}</p>
         <ul class="grid gap-1.5 grid-cols-1 sm:grid-cols-2">${cards}</ul>
       </div>
     `;
@@ -389,7 +389,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     }
     const dur = att.durationSec != null ? `${att.durationSec.toFixed(1)}s · ` : '';
     return `<audio controls src="${escapeHtml(att.objectUrl)}" class="block w-full max-w-xs mb-1 h-9"></audio>
-            <p class="text-[10px] text-zinc-500 mb-1">${dur}${escapeHtml(att.mimeType)}</p>`;
+            <p class="text-[10px] text-zinc-600 dark:text-zinc-300 mb-1">${dur}${escapeHtml(att.mimeType)}</p>`;
   }
 
   function renderCascadeFooter(turn: ChatTurn, idx: number): string {
@@ -398,7 +398,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     const best = cr.best;
     const pct = Math.round((best.confidence ?? 0) * 100);
     const sciHtml = best.scientific_name ? `<span class="italic font-medium">${escapeHtml(best.scientific_name)}</span>` : '';
-    const sourceHtml = `<span class="text-[10px] text-zinc-500">${pct}% · ${escapeHtml(best.source)}</span>`;
+    const sourceHtml = `<span class="text-[10px] text-zinc-600 dark:text-zinc-300">${pct}% · ${escapeHtml(best.source)}</span>`;
     const saveLabel = i18nGet('save-as-observation');
     return `
       <div class="mt-1 flex items-center gap-2 flex-wrap">

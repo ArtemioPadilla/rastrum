@@ -71,18 +71,18 @@ const sponsoringI18n = {
   data-label-block-error={tr.socialgraph.block.block_error}
   data-share-obs-base="/share/obs/"
 >
-  <div data-pp-loading class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+  <div data-pp-loading class="py-12 text-center text-sm text-zinc-600 dark:text-zinc-400">
     {tr.profile.public_profile_loading}
   </div>
 
   <div data-pp-private class="hidden py-12 text-center">
     <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.private_profile_empty_title}</p>
-    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.private_profile_empty_body}</p>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{pm.private_profile_empty_body}</p>
   </div>
 
   <div data-pp-not-found class="hidden py-12 text-center">
     <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.not_found_title}</p>
-    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.not_found_body}</p>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{pm.not_found_body}</p>
     <a href={`/${lang}/${lang === 'es' ? 'explorar/recientes' : 'explore/recent'}/`} class="mt-3 inline-block text-emerald-700 dark:text-emerald-400 hover:underline">
       {pm.not_found_cta}
     </a>
@@ -90,7 +90,7 @@ const sponsoringI18n = {
 
   <div data-pp-signed-in class="hidden py-12 text-center">
     <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.signed_in_required_title}</p>
-    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.signed_in_required_body}</p>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{pm.signed_in_required_body}</p>
     <a href={`/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`} class="mt-3 inline-block text-emerald-700 dark:text-emerald-400 hover:underline">
       {lang === 'es' ? 'Iniciar sesión →' : 'Sign in →'}
     </a>
@@ -109,23 +109,23 @@ const sponsoringI18n = {
       </span>
       <div class="min-w-0 flex-1">
         <h1 data-pp-name class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">—</h1>
-        <p class="text-sm text-zinc-500 mt-0.5">
+        <p class="text-sm text-zinc-600 dark:text-zinc-300 mt-0.5">
           <span data-pp-handle>@—</span>
           <span data-pp-region-sep class="hidden"> · </span>
           <span data-pp-region></span>
         </p>
         <p data-pp-bio class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
-        <p data-pp-since class="mt-2 text-xs text-zinc-500"></p>
+        <p data-pp-since class="mt-2 text-xs text-zinc-600 dark:text-zinc-300"></p>
         <p data-pp-name-owner-only data-owner-only-badge class="hidden mt-1 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
         <div data-pp-social-pills class="hidden mt-3 flex items-center gap-4 text-sm">
           <a data-pp-followers-link href="#" class="group inline-flex items-baseline gap-1.5 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
             <span data-pp-followers-count class="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">0</span>
-            <span class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'seguidores' : 'followers'}</span>
+            <span class="text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">{lang === 'es' ? 'seguidores' : 'followers'}</span>
           </a>
           <span class="h-3 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden="true"></span>
           <a data-pp-following-link href="#" class="group inline-flex items-baseline gap-1.5 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
             <span data-pp-following-count class="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">0</span>
-            <span class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'siguiendo' : 'following'}</span>
+            <span class="text-xs uppercase tracking-wider text-zinc-600 dark:text-zinc-400">{lang === 'es' ? 'siguiendo' : 'following'}</span>
           </a>
           <a id="sponsor-badge" data-pp-sponsor-badge href="#" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
             <span aria-hidden="true">🤝</span>
@@ -167,7 +167,7 @@ const sponsoringI18n = {
               class="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
               role="menuitem"
             >
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <span data-pp-action-block-label>{tr.socialgraph.block.button}</span>
             </button>
             <button
@@ -176,7 +176,7 @@ const sponsoringI18n = {
               class="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800"
               role="menuitem"
             >
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
               <span data-pp-action-report-label>{tr.socialgraph.report.button}</span>
             </button>
           </div>
@@ -187,15 +187,15 @@ const sponsoringI18n = {
     <section data-pp-stats class="hidden grid-cols-3 gap-3 mb-8 grid">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p data-pp-stat-obs class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
-        <p class="text-xs text-zinc-500">{tr.profile.total_observations}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.total_observations}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p data-pp-stat-rg class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
-        <p class="text-xs text-zinc-500">{tr.profile.research_grade}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300">{tr.profile.research_grade}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p data-pp-stat-kingdoms class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
-        <p class="text-xs text-zinc-500">{lang === 'es' ? 'Reinos' : 'Kingdoms'}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300">{lang === 'es' ? 'Reinos' : 'Kingdoms'}</p>
       </div>
       <p data-pp-stats-owner-only data-owner-only-badge class="hidden col-span-3 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
     </section>
@@ -213,7 +213,7 @@ const sponsoringI18n = {
         <div data-pp-map-skeleton class="absolute inset-0 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-xl"></div>
       </div>
       <!-- Shown when observer has 0 mapped pins -->
-      <p data-pp-map-empty class="hidden text-sm text-zinc-500 dark:text-zinc-400 mt-3">
+      <p data-pp-map-empty class="hidden text-sm text-zinc-600 dark:text-zinc-400 mt-3">
         {lang === 'es' ? 'Aún no hay observaciones mapeadas.' : 'No mapped observations yet.'}
       </p>
       <p data-pp-map-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
@@ -235,7 +235,7 @@ const sponsoringI18n = {
     <section data-pp-pokedex-section class="hidden mb-8">
       <a data-pp-pokedex-link class="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-emerald-400 dark:hover:border-emerald-700">
         <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Pokédex →</p>
-        <p class="text-xs text-zinc-500">{lang === 'es' ? 'Ver todas las especies observadas' : 'View every observed species'}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300">{lang === 'es' ? 'Ver todas las especies observadas' : 'View every observed species'}</p>
       </a>
       <p data-pp-pokedex-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
     </section>

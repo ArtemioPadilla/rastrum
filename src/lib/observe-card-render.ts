@@ -80,11 +80,11 @@ function actionsRow(vm: CardViewModel, s: CardStrings): string {
 }
 
 function provenanceStrip(s: CardStrings): string {
-  return `<span class="text-xs text-zinc-500 dark:text-zinc-400">${s.provenanceDevice} → ${s.provenanceCloud} → ${s.provenanceCommunity}</span>`;
+  return `<span class="text-xs text-zinc-600 dark:text-zinc-400">${s.provenanceDevice} → ${s.provenanceCloud} → ${s.provenanceCommunity}</span>`;
 }
 
 function renderS0(s: CardStrings): string {
-  return `<p class="text-sm text-zinc-500 dark:text-zinc-400">${s.analyzing} <span class="animate-pulse">⟳</span></p>`;
+  return `<p class="text-sm text-zinc-600 dark:text-zinc-400">${s.analyzing} <span class="animate-pulse">⟳</span></p>`;
 }
 
 function renderS1a(vm: CardViewModel, s: CardStrings): string {
@@ -116,7 +116,7 @@ function renderS2prime(vm: CardViewModel, s: CardStrings): string {
 
 function renderS3(s: CardStrings): string {
   return `<p class="font-medium">${s.unidentified}</p>
-<p class="text-xs text-zinc-500 dark:text-zinc-400">${s.willIdentifyOnSync}</p>`;
+<p class="text-xs text-zinc-600 dark:text-zinc-400">${s.willIdentifyOnSync}</p>`;
 }
 
 function traceRow(e: TraceEntry, s: CardStrings): string {
@@ -134,8 +134,8 @@ function traceRow(e: TraceEntry, s: CardStrings): string {
 function renderTracePanel(vm: CardViewModel, s: CardStrings): string {
   const rows = vm.trace.length
     ? vm.trace.map((e) => traceRow(e, s)).join('')
-    : `<tr><td colspan="5" class="py-2 text-zinc-500 dark:text-zinc-400">${esc(s.traceNoAttempts)}</td></tr>`;
-  return `<div data-card-trace-panel hidden class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700"><table class="w-full text-xs text-left"><thead class="text-zinc-500 dark:text-zinc-400"><tr><th class="py-1 pr-2 font-medium">${esc(s.traceColSource)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColWhere)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColPrediction)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColConfidence)}</th><th class="py-1 font-medium">${esc(s.traceColOutcome)}</th></tr></thead><tbody>${rows}</tbody></table><p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">${esc(s.traceConsensusPending)}</p><button type="button" data-card-trace-json class="mt-2 underline text-xs">${esc(s.traceExportJson)}</button></div>`;
+    : `<tr><td colspan="5" class="py-2 text-zinc-600 dark:text-zinc-400">${esc(s.traceNoAttempts)}</td></tr>`;
+  return `<div data-card-trace-panel hidden class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700"><table class="w-full text-xs text-left"><thead class="text-zinc-600 dark:text-zinc-400"><tr><th class="py-1 pr-2 font-medium">${esc(s.traceColSource)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColWhere)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColPrediction)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColConfidence)}</th><th class="py-1 font-medium">${esc(s.traceColOutcome)}</th></tr></thead><tbody>${rows}</tbody></table><p class="text-xs text-zinc-600 dark:text-zinc-400 mt-2">${esc(s.traceConsensusPending)}</p><button type="button" data-card-trace-json class="mt-2 underline text-xs">${esc(s.traceExportJson)}</button></div>`;
 }
 
 export function renderProgressiveCardHtml(vm: CardViewModel, s: CardStrings): string {

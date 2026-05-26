@@ -58,7 +58,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
   <!-- Page header -->
   <div class="px-4 pt-6 pb-2">
     <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{title}</h1>
-    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{subtitle}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{subtitle}</p>
   </div>
 
   <!-- Loading skeleton (shown until JS hydrates) -->
@@ -68,7 +68,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
 
   <!-- Sign-in prompt (shown when logged out) -->
   <div id="discover-signin-prompt" class="hidden px-4 py-8 text-center">
-    <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3">{signInHint}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{signInHint}</p>
     <a
       href={`/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`}
       class="inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
@@ -92,7 +92,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
       <div id="discover-followed-list" class="space-y-3" role="list">
         <!-- Populated by JS -->
       </div>
-      <p id="discover-followed-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noFollowsHint}</p>
+      <p id="discover-followed-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-300 italic">{noFollowsHint}</p>
     </section>
 
     <!-- Section: Nearby species -->
@@ -105,7 +105,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
       <div id="discover-nearby-list" class="flex flex-wrap gap-2" role="list">
         <!-- Populated by JS -->
       </div>
-      <p id="discover-nearby-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noNearbyHint}</p>
+      <p id="discover-nearby-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-300 italic">{noNearbyHint}</p>
     </section>
 
     <!-- Section: Trending this week -->
@@ -121,7 +121,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
       <div id="discover-trending-list" class="flex flex-wrap gap-2" role="list">
         <!-- Populated by JS -->
       </div>
-      <p id="discover-trending-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noTrendingHint}</p>
+      <p id="discover-trending-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-300 italic">{noTrendingHint}</p>
     </section>
   </div>
 </section>
@@ -191,10 +191,10 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
     name.className = 'text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate italic';
     name.textContent = obs.scientific_name ?? '—';
     const observer = document.createElement('span');
-    observer.className = 'text-xs text-zinc-500 dark:text-zinc-400 truncate';
+    observer.className = 'text-xs text-zinc-600 dark:text-zinc-400 truncate';
     observer.textContent = obs.observer_username ? `@${obs.observer_username}` : '';
     const date = document.createElement('span');
-    date.className = 'text-xs text-zinc-400 dark:text-zinc-500 mt-0.5';
+    date.className = 'text-xs text-zinc-400 dark:text-zinc-300 mt-0.5';
     date.textContent = obs.observed_at ? new Date(obs.observed_at).toLocaleDateString() : '';
     info.appendChild(name);
     info.appendChild(observer);
@@ -212,7 +212,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
     anchor.href = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(slug)}`;
     anchor.role = 'listitem';
     anchor.className = 'inline-flex items-center gap-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors border border-zinc-200 dark:border-zinc-700';
-    anchor.innerHTML = `<span class="italic">${sp.taxon_name}</span>${sp.common_name ? `<span class="text-zinc-500">· ${sp.common_name}</span>` : ''}`;
+    anchor.innerHTML = `<span class="italic">${sp.taxon_name}</span>${sp.common_name ? `<span class="text-zinc-600 dark:text-zinc-300">· ${sp.common_name}</span>` : ''}`;
     return anchor;
   }
 

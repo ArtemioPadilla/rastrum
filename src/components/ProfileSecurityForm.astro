@@ -17,7 +17,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
       {tr.profile.identities_heading}
     </h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">{tr.profile.identities_hint}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-4">{tr.profile.identities_hint}</p>
 
     <div id="identity-list" class="space-y-2 mb-4">
       <p class="text-xs text-zinc-400 italic">{tr.profile.identities_loading}</p>
@@ -49,7 +49,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
         <span data-pk-label>{tr.auth.register_passkey}</span>
       </button>
       <p id="passkey-msg" class="hidden text-sm"></p>
-      <p id="passkey-unsupported" class="hidden text-xs text-zinc-500 italic">{tr.auth.passkey_unavailable}</p>
+      <p id="passkey-unsupported" class="hidden text-xs text-zinc-600 dark:text-zinc-300 italic">{tr.auth.passkey_unavailable}</p>
 
       <div class="pt-2">
         <button id="signout-all-btn" type="button" class="text-sm text-red-600 dark:text-red-400 hover:underline disabled:opacity-50">
@@ -176,7 +176,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
         <div class="flex items-start justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2" data-identity-provider="${id.provider}">
           <div>
             <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${PROVIDERS_LABEL[id.provider] ?? id.provider}</span>
-            ${id.email ? `<span class="ml-2 text-xs text-zinc-500">${id.email}</span>` : ''}
+            ${id.email ? `<span class="ml-2 text-xs text-zinc-600 dark:text-zinc-300">${id.email}</span>` : ''}
             <div class="text-xs text-zinc-400">Added ${fmtDate(id.created_at)} · Last sign-in ${fmtDate(id.last_sign_in_at)}</div>
           </div>
           ${identities.length > 1 ? `<button data-unlink-provider="${id.provider}" class="ml-4 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0.5 shrink-0">Remove</button>` : ''}

@@ -110,7 +110,7 @@ const weathers = WEATHERS;
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
         {isEs ? "Procesando archivos" : "Processing files"}
       </h2>
-      <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
+      <span id="obs2-pipeline-status" class="text-xs text-zinc-600 dark:text-zinc-400"></span>
     </div>
     <PipelineStepper lang={lang} />
     <!-- Escape hatch: shown after 15s if pipeline is still running (#pipeline-stuck) -->
@@ -118,7 +118,7 @@ const weathers = WEATHERS;
       <button
         type="button"
         id="obs2-pipeline-skip-btn"
-        class="text-xs text-zinc-500 dark:text-zinc-400 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-200"
+        class="text-xs text-zinc-600 dark:text-zinc-400 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-200"
       >
         {isEs ? 'Saltar identificación y continuar →' : 'Skip identification and continue →'}
       </button>
@@ -144,7 +144,7 @@ const weathers = WEATHERS;
       <!-- Manual entry — on-demand only; revealed by the card's
            "✎ No, es otra…" action or the WhyThisSpecies report button. -->
       <div id="obs2-id-manual" class="mt-2 hidden">
-        <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+        <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-600 dark:text-zinc-400 mb-1">
           {isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
         </label>
         <TaxonAutocomplete inputId="obs2-taxon-input" lang={lang} />
@@ -166,7 +166,7 @@ const weathers = WEATHERS;
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
         {isEs ? "Ubicación" : "Location"}
       </label>
-      <div id="obs2-gps-status" class="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+      <div id="obs2-gps-status" class="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
         {isEs ? "Obteniendo GPS..." : "Acquiring GPS..."}
       </div>
       <MapPicker mode="edit" lang={lang} pickerId="obs2-map" initialCoords={null} />
@@ -261,7 +261,7 @@ const weathers = WEATHERS;
             <label for="obs2-sensitive" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {observeStr.content_sensitive_label ?? (isEs ? "Contiene contenido gráfico" : "Contains graphic content")}
             </label>
-            <p class="text-xs text-zinc-400 dark:text-zinc-500">
+            <p class="text-xs text-zinc-400 dark:text-zinc-300">
               {observeStr.content_sensitive_hint ?? (isEs ? "Fotos se difuminarán para otros usuarios" : "Photos will be blurred for other users")}
             </p>
           </div>
@@ -502,6 +502,7 @@ function applyChipStyles(active: TaxonHint | null): void {
     chip.classList.toggle('border-zinc-300', !isActive);
     chip.classList.toggle('dark:border-zinc-600', !isActive);
     chip.classList.toggle('text-zinc-600', !isActive);
+    chip.classList.toggle('dark:text-zinc-300', !isActive);
     chip.classList.toggle('dark:text-zinc-400', !isActive);
   });
 }
@@ -1395,7 +1396,7 @@ postForm?.addEventListener('submit', async (e) => {
         linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${viewLabel}</a>`;
       };
       const showSyncing = () => {
-        linkEl.innerHTML = `<span class="text-zinc-500 dark:text-zinc-400 text-sm" aria-live="polite">${syncingLabel}</span>`;
+        linkEl.innerHTML = `<span class="text-zinc-600 dark:text-zinc-400 text-sm" aria-live="polite">${syncingLabel}</span>`;
       };
 
       let resolved = false;

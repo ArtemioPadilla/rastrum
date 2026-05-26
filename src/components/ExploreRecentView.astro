@@ -156,10 +156,10 @@ const distancePage = page as unknown as Record<string, string>;
         <span aria-hidden="true">📍</span>
         <span>{distancePage.distance_filter_show ?? 'Show observations near me'}</span>
       </button>
-      <p class="er-distance-locating hidden text-xs text-zinc-400 dark:text-zinc-500">
+      <p class="er-distance-locating hidden text-xs text-zinc-400 dark:text-zinc-300">
         {distancePage.distance_filter_locating ?? 'Getting your location…'}
       </p>
-      <p class="er-distance-no-loc hidden text-xs text-zinc-400 dark:text-zinc-500">
+      <p class="er-distance-no-loc hidden text-xs text-zinc-400 dark:text-zinc-300">
         {distancePage.distance_filter_no_location ?? 'Enable location to filter by distance'}
       </p>
       <div class="er-distance-btns hidden flex flex-wrap gap-1.5"></div>
@@ -184,7 +184,7 @@ const distancePage = page as unknown as Record<string, string>;
   <!-- Timeline mode block -->
   <div id="er-timeline-block" class="hidden mt-2 space-y-4"></div>
 
-  <p class="er-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+  <p class="er-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-600 dark:text-zinc-400">
     {page.empty}
   </p>
 
@@ -353,7 +353,7 @@ const distancePage = page as unknown as Record<string, string>;
 
     const observerHtml = isPublic && observerUsername
       ? `${avatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 underline decoration-emerald-300 dark:decoration-emerald-700 underline-offset-2 hover:decoration-emerald-500" data-stop>${escapeText(observerName || observerUsername)}</a>`
-      : `<span class="text-zinc-500">${escapeText(anonLabel)}</span>`;
+      : `<span class="text-zinc-600 dark:text-zinc-300">${escapeText(anonLabel)}</span>`;
 
     const confidencePill = confidence !== null
       ? `<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${colorForConfidence(confidence)}">${Math.round(confidence * 100)}%</span>`
@@ -380,11 +380,11 @@ const distancePage = page as unknown as Record<string, string>;
           </button>
           <div class="er-overflow-menu hidden absolute right-0 top-10 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden" role="menu">
             <button type="button" class="er-action-block flex w-full min-h-[44px] items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockObserverAria)}">
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <span>${escapeText(labels.block)}</span>
             </button>
             <button type="button" class="er-action-report flex w-full min-h-[44px] items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportAria)}">
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
               <span>${escapeText(labels.report)}</span>
             </button>
           </div>
@@ -439,20 +439,20 @@ const distancePage = page as unknown as Record<string, string>;
               : hasVideoOnly
                 ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstVideoUrl)}" data-media-kind="video"></div>`
                 : audioMedia.length > 0
-                  ? `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="Audio observation"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>`
-                  : `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="No photo"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`}
+                  ? `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-300" role="img" aria-label="Audio observation"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>`
+                  : `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-300" role="img" aria-label="No photo"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`}
           ${mediaBadgeHtml}
         </div>
         <div class="p-3 space-y-1">
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
           ${commonHtml}
-          <div class="flex items-center gap-2 flex-wrap text-xs text-zinc-500 dark:text-zinc-400">
+          <div class="flex items-center gap-2 flex-wrap text-xs text-zinc-600 dark:text-zinc-400">
             ${researchGradePill}
             ${confidencePill}
             ${faveChipHtml}
             <span>${escapeText(ago)}</span>
           </div>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1.5">${observerHtml}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 truncate flex items-center gap-1.5">${observerHtml}</p>
         </div>
       </a>
     </li>`;
@@ -657,7 +657,7 @@ const distancePage = page as unknown as Record<string, string>;
         : '';
       const observerHtml = isPublic && observerUsername
         ? `${listAvatarHtml}<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 underline decoration-emerald-300 dark:decoration-emerald-700 underline-offset-2 hover:decoration-emerald-500">${escapeText(observerName || observerUsername)}</a>`
-        : `<span class="text-zinc-500">${escapeText(anonLabel)}</span>`;
+        : `<span class="text-zinc-600 dark:text-zinc-300">${escapeText(anonLabel)}</span>`;
       // Media type badge for list thumbnail
       const mediaBadge = hasAudioOnly
         ? `<span class="absolute bottom-1 right-1 inline-flex items-center rounded bg-black/60 px-1 py-0.5 text-[9px] text-white font-semibold">🎵</span>`
@@ -679,15 +679,16 @@ const distancePage = page as unknown as Record<string, string>;
       const thumb = photo
         ? listThumbHtml
         : hasAudioOnly
-          ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" role="img" aria-label="Audio observation"><svg class="w-5 h-5 text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
-          : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="No photo"><svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`;
+          ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" role="img" aria-label="Audio observation"><svg class="w-5 h-5 text-zinc-400 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
+          : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-300" role="img" aria-label="No photo"><svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`;
       const listObsAriaLabel = labels.observationLinkAria.replace('{species}', sciText);
       return `<a href="${shareBase}?id=${encodeURIComponent(r.id)}" class="flex items-center gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors px-3 py-2" aria-label="${escapeText(listObsAriaLabel)}">
+
         ${thumb}
         <div class="min-w-0 flex-1">
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sciText)}</p>
-          ${common ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">${escapeText(common)}</p>` : ''}
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1.5">${observerHtml}${isPublic && observerUsername ? ` · ${escapeText(ago)}` : escapeText(ago)}</p>
+          ${common ? `<p class="text-xs text-zinc-600 dark:text-zinc-400 truncate">${escapeText(common)}</p>` : ''}
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 truncate flex items-center gap-1.5">${observerHtml}${isPublic && observerUsername ? ` · ${escapeText(ago)}` : escapeText(ago)}</p>
         </div>
       </a>`;
     }
@@ -728,7 +729,7 @@ const distancePage = page as unknown as Record<string, string>;
         }
         html += `<div class="space-y-2">
           <div class="er-timeline-day-header bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm py-1.5 px-1 -mx-1 rounded">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">${escapeText(heading)}</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">${escapeText(heading)}</h3>
           </div>
           <div class="space-y-2">${dateRows.map(listRowMarkup).join('')}</div>
         </div>`;

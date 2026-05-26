@@ -120,7 +120,7 @@ const langJson = JSON.stringify(lang);
         {lang === 'es' ? 'Donar al pool' : 'Donate to pool'}
       </button>
     </div>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+    <p class="text-xs text-zinc-600 dark:text-zinc-400 max-w-2xl">
       {lang === 'es'
         ? 'Dona N llamadas a un pool compartido. Cualquier usuario puede consumirlo (con un cap diario por persona). Tú sólo ves estadísticas agregadas — los beneficiarios son anónimos.'
         : 'Donate N calls to a shared pool. Any user can consume it (with a per-person daily cap). You only see aggregate stats — beneficiaries stay anonymous.'}
@@ -136,7 +136,7 @@ const langJson = JSON.stringify(lang);
     </div>
 
     <ul id="pools-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
-    <p id="pools-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
+    <p id="pools-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-400">
       {lang === 'es' ? 'Aún no has donado al pool.' : 'You haven’t donated to the pool yet.'}
     </p>
   </section>
@@ -155,7 +155,7 @@ const langJson = JSON.stringify(lang);
       <div>
         <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
         <input id="pool-model-input" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-5.4-mini","azure_openai":"gpt-5.4-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
-        <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
+        <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400"></div>
       </div>
       <div>
         <label class="block text-sm font-medium" for="pool-daily-input">{lang === 'es' ? 'Cap diario por usuario' : 'Daily cap per user'}</label>
@@ -180,7 +180,7 @@ const langJson = JSON.stringify(lang);
       <div>
         <label class="block text-sm font-medium" for="edit-pool-cap">{tr.sponsoring.pool_management.field_total_cap}</label>
         <input id="edit-pool-cap" type="number" min="1" max="1000000" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
-        <p id="edit-pool-cap-hint" class="mt-1 text-xs text-zinc-500"></p>
+        <p id="edit-pool-cap-hint" class="mt-1 text-xs text-zinc-600 dark:text-zinc-300"></p>
       </div>
       <div>
         <label class="block text-sm font-medium" for="edit-pool-model">{tr.sponsoring.pool_management.field_preferred_model}</label>
@@ -202,11 +202,11 @@ const langJson = JSON.stringify(lang);
   <dialog id="pool-beneficiaries-dialog" class="rounded-xl p-6 max-w-2xl w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
     <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.pool_management.beneficiaries_title}</h3>
     <input id="ben-pool-id" type="hidden" />
-    <div id="pool-bens-loading" class="hidden text-sm text-zinc-500">{tr.sponsoring.pool_management.beneficiaries_loading}</div>
-    <p id="pool-bens-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">{tr.sponsoring.pool_management.beneficiaries_empty}</p>
+    <div id="pool-bens-loading" class="hidden text-sm text-zinc-600 dark:text-zinc-300">{tr.sponsoring.pool_management.beneficiaries_loading}</div>
+    <p id="pool-bens-empty" class="hidden text-sm text-zinc-600 dark:text-zinc-400">{tr.sponsoring.pool_management.beneficiaries_empty}</p>
     <table id="pool-bens-table" class="hidden min-w-full text-sm">
       <thead>
-        <tr class="text-left text-zinc-500">
+        <tr class="text-left text-zinc-600 dark:text-zinc-300">
           <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_user}</th>
           <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_calls}</th>
           <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_last_seen}</th>
@@ -215,7 +215,7 @@ const langJson = JSON.stringify(lang);
       <tbody id="pool-bens-tbody"></tbody>
     </table>
     <div id="pool-bens-pager" class="mt-4 flex items-center justify-between">
-      <span id="pool-bens-page-label" class="text-xs text-zinc-500"></span>
+      <span id="pool-bens-page-label" class="text-xs text-zinc-600 dark:text-zinc-300"></span>
       <div class="flex gap-2">
         <button id="pool-bens-prev" type="button" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">{tr.sponsoring.pool_management.page_prev}</button>
         <button id="pool-bens-next" type="button" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">{tr.sponsoring.pool_management.page_next}</button>
@@ -239,7 +239,7 @@ const langJson = JSON.stringify(lang);
     </button>
     <table class="min-w-full text-sm">
       <thead>
-        <tr class="text-left text-zinc-500">
+        <tr class="text-left text-zinc-600 dark:text-zinc-300">
           <th class="py-2 pr-4">{tr.sponsoring.beneficiary_username}</th>
           <th class="py-2 pr-4">{tr.sponsoring.monthly_cap}</th>
           <th class="py-2 pr-4">{tr.sponsoring.priority}</th>
@@ -263,24 +263,24 @@ const langJson = JSON.stringify(lang);
     </div>
     <div id="analytics-content" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-        <h3 id="sparkline-heading" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.calls_last_30d}</h3>
+        <h3 id="sparkline-heading" class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-2">{tr.sponsoring.calls_last_30d}</h3>
         <svg id="sparkline" class="w-full h-16" viewBox="0 0 300 64" preserveAspectRatio="none">
           <polyline id="sparkline-path" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-600" points="" />
         </svg>
         <p id="sparkline-total" class="mt-1 text-sm font-medium">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.top_beneficiaries}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-2">{tr.sponsoring.top_beneficiaries}</h3>
         <ul id="top-bens" class="text-sm space-y-1"></ul>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.karma_generated}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-2">{tr.sponsoring.karma_generated}</h3>
         <p id="karma-this-month" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.estimated_cost}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 mb-2">{tr.sponsoring.estimated_cost}</h3>
         <p id="estimated-cost" class="text-2xl font-bold">—</p>
-        <p id="estimated-cost-note" class="text-xs text-zinc-500 mt-1"></p>
+        <p id="estimated-cost-note" class="text-xs text-zinc-600 dark:text-zinc-300 mt-1"></p>
       </div>
     </div>
   </section>
@@ -291,13 +291,13 @@ const langJson = JSON.stringify(lang);
       <div>
         <label class="block text-sm font-medium" for="cred-label-input">{tr.sponsoring.credential_label}</label>
         <input id="cred-label-input" name="label" required maxlength="64" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
-        <p class="mt-1 text-xs text-zinc-500">{tr.sponsoring.credential_label_help}</p>
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{tr.sponsoring.credential_label_help}</p>
       </div>
       <div>
         <label class="block text-sm font-medium" for="cred-secret-input">{tr.sponsoring.credential_secret}</label>
         <input id="cred-secret-input" name="secret" type="password" autocomplete="off" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
-        <p id="cred-kind-preview" class="mt-1 text-xs text-zinc-500"></p>
-        <p class="mt-1 text-xs text-zinc-500">{tr.sponsoring.secret_help}</p>
+        <p id="cred-kind-preview" class="mt-1 text-xs text-zinc-600 dark:text-zinc-300"></p>
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{tr.sponsoring.secret_help}</p>
       </div>
 
       <!-- M32 (#152): provider + model selection. The secret-prefix
@@ -326,13 +326,13 @@ const langJson = JSON.stringify(lang);
         <a id="cred-model-docs-link" href="#" target="_blank" rel="noopener" class="mt-0.5 block text-xs text-emerald-700 dark:text-emerald-400 hover:underline hidden">
           {lang === 'es' ? 'Ver modelos disponibles →' : 'Browse available models →'}
         </a>
-        <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
-        <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
+        <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-600 dark:text-zinc-400"></div>
       </div>
       <div id="cred-endpoint-row" class="hidden">
         <label class="block text-sm font-medium" for="cred-endpoint-input">{lang === 'es' ? 'Endpoint' : 'Endpoint'}</label>
         <input id="cred-endpoint-input" name="endpoint" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
-        <p id="cred-endpoint-help" class="mt-1 text-xs text-zinc-500"></p>
+        <p id="cred-endpoint-help" class="mt-1 text-xs text-zinc-600 dark:text-zinc-300"></p>
       </div>
 
       <div class="space-y-2">
@@ -573,7 +573,7 @@ const langJson = JSON.stringify(lang);
     const emptyCrosslink = document.getElementById('creds-empty-crosslink');
     if (creds.length === 0) {
       const emptyMsg = (credsSection as HTMLElement).dataset.emptyMsg ?? '';
-      credsList.innerHTML = `<li class="py-3 text-sm text-zinc-500">${escHtml(emptyMsg)}</li>`;
+      credsList.innerHTML = `<li class="py-3 text-sm text-zinc-600 dark:text-zinc-300">${escHtml(emptyMsg)}</li>`;
       emptyCrosslink?.classList.remove('hidden');
       return;
     }
@@ -588,13 +588,13 @@ const langJson = JSON.stringify(lang);
         : '';
       li.innerHTML = `
         <div class="min-w-0 flex-1">
-          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span>${personalBadge}</div>
-          <div class="text-xs text-zinc-500">${escHtml(validated)}</div>
+          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-600 dark:text-zinc-300">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span>${personalBadge}</div>
+          <div class="text-xs text-zinc-600 dark:text-zinc-300">${escHtml(validated)}</div>
           <label class="mt-1.5 inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer">
             <input type="checkbox" data-personal-toggle="${escHtml(c.id)}" ${isPersonal ? 'checked' : ''} class="rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500" />
             <span>
               <span class="font-medium">${escHtml(tr.personal_toggle_label)}</span>
-              <span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${escHtml(tr.personal_toggle_hint)}</span>
+              <span class="block text-[11px] text-zinc-600 dark:text-zinc-400">${escHtml(tr.personal_toggle_hint)}</span>
             </span>
           </label>
         </div>
@@ -899,7 +899,7 @@ const langJson = JSON.stringify(lang);
               <span class="text-sm font-mono text-zinc-700 dark:text-zinc-300">${escHtml(p.preferred_model)}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider ${statusClass}">${escHtml(p.status)}</span>
             </div>
-            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <div class="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
               ${p.used} / ${p.total_cap} (${pct}%) · daily-user-cap ${p.daily_user_cap}${p.monthly_reset ? ' · monthly-reset' : ''}
             </div>
             <div class="mt-1 h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
@@ -1035,10 +1035,10 @@ const langJson = JSON.stringify(lang);
           <tr class="border-t border-zinc-200 dark:border-zinc-800">
             <td class="py-2 pr-4">
               <a href="/${pageLang}/${pageLang === 'es' ? 'perfil' : 'profile'}/u/${escHtml(b.username)}/" class="text-sky-700 dark:text-sky-400 hover:underline">${escHtml(display)}</a>
-              <span class="ml-1 text-xs text-zinc-500">@${escHtml(b.username)}</span>
+              <span class="ml-1 text-xs text-zinc-600 dark:text-zinc-300">@${escHtml(b.username)}</span>
             </td>
             <td class="py-2 pr-4 font-mono text-sm">${b.total_calls}</td>
-            <td class="py-2 pr-4 text-xs text-zinc-500">${escHtml(b.last_seen)}</td>
+            <td class="py-2 pr-4 text-xs text-zinc-600 dark:text-zinc-300">${escHtml(b.last_seen)}</td>
           </tr>
         `;
       }).join('');
@@ -1193,14 +1193,14 @@ const langJson = JSON.stringify(lang);
       const row = document.createElement('tr');
       row.className = 'border-t border-zinc-200 dark:border-zinc-800';
       const statusColor = b.status === 'active' ? 'text-emerald-600' :
-                          b.status === 'paused' ? 'text-amber-600' : 'text-zinc-500';
+                          b.status === 'paused' ? 'text-amber-600' : 'text-zinc-600 dark:text-zinc-300';
       const pausedExtra = b.paused_reason ? ` (${escHtml(friendlyPausedReason(b.paused_reason))})` : '';
       const unpauseBtn = b.status === 'paused'
         ? `<button data-unpause="${escHtml(b.id)}" class="text-sm text-emerald-700">Reactivate</button>`
         : '';
       const u = usersMap[b.beneficiary_id];
       const benName = u ? escHtml(u.display_name || u.username) : escHtml(b.beneficiary_id.slice(0, 8) + '…');
-      const benHandle = u ? `<span class="text-xs text-zinc-500">@${escHtml(u.username)}</span>` : '';
+      const benHandle = u ? `<span class="text-xs text-zinc-600 dark:text-zinc-300">@${escHtml(u.username)}</span>` : '';
       const selfBadge = b.beneficiary_id === myId
         ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-xs">${escHtml(tr.self_sponsorship_badge)}</span>`
         : '';
@@ -1325,7 +1325,7 @@ const langJson = JSON.stringify(lang);
     const topBensEl = document.getElementById('top-bens');
     if (topBensEl) {
       if (topIds.length === 0) {
-        topBensEl.innerHTML = `<li class="text-zinc-500">—</li>`;
+        topBensEl.innerHTML = `<li class="text-zinc-600 dark:text-zinc-300">—</li>`;
       } else {
         const ids = topIds.map(([id]) => id);
         const { data: users } = await supabase.from('users').select('id,username,display_name,karma_total').in('id', ids);
@@ -1337,9 +1337,9 @@ const langJson = JSON.stringify(lang);
           const name = u?.display_name || u?.username || id.slice(0, 8) + '…';
           const lowKarma = u && u.karma_total < 10;
           const note = lowKarma
-            ? `<span class="block text-xs text-zinc-500 mt-0.5">${escHtml(tr.below_engagement_threshold.replace('{username}', u.username))}</span>`
+            ? `<span class="block text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">${escHtml(tr.below_engagement_threshold.replace('{username}', u.username))}</span>`
             : '';
-          return `<li><span class="font-medium">${escHtml(name)}</span> <span class="text-zinc-500">— ${count} calls</span>${note}</li>`;
+          return `<li><span class="font-medium">${escHtml(name)}</span> <span class="text-zinc-600 dark:text-zinc-300">— ${count} calls</span>${note}</li>`;
         }).join('');
       }
     }
@@ -1386,7 +1386,7 @@ const langJson = JSON.stringify(lang);
     }
     list.innerHTML = '';
     if (requests.length === 0) {
-      list.innerHTML = `<li class="py-3 text-sm text-zinc-500">${escHtml(tr.requests_empty ?? '')}</li>`;
+      list.innerHTML = `<li class="py-3 text-sm text-zinc-600 dark:text-zinc-300">${escHtml(tr.requests_empty ?? '')}</li>`;
       return;
     }
     const supabase = (await import('../lib/supabase')).getSupabase();
@@ -1405,7 +1405,7 @@ const langJson = JSON.stringify(lang);
       li.className = 'py-3 flex items-start justify-between gap-4';
       li.innerHTML = `
         <div class="flex-1">
-          <div class="font-medium">${escHtml(name)} <span class="text-xs text-zinc-500">${escHtml(handle)}</span></div>
+          <div class="font-medium">${escHtml(name)} <span class="text-xs text-zinc-600 dark:text-zinc-300">${escHtml(handle)}</span></div>
           ${req.message ? `<div class="text-sm text-zinc-600 dark:text-zinc-400 mt-1 italic">"${escHtml(req.message)}"</div>` : ''}
         </div>
         <div class="flex gap-2 shrink-0">

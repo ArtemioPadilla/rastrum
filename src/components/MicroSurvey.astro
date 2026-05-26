@@ -93,7 +93,7 @@ const l = labels[lang] ?? labels.en;
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors min-h-[44px]';
-          btn.innerHTML = `<span class="text-xl">${e.emoji}</span><span class="text-[10px] text-zinc-500">${e.label}</span>`;
+          btn.innerHTML = `<span class="text-xl">${e.emoji}</span><span class="text-[10px] text-zinc-600 dark:text-zinc-300">${e.label}</span>`;
           btn.addEventListener('click', () => submitResponse({ rating: e.value }));
           optionsEl.appendChild(btn);
         }

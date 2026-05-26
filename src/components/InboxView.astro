@@ -58,7 +58,7 @@ const subtitleCopy = lang === 'es'
       <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
         {inboxTr.title}
       </h1>
-      <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">{subtitleCopy}</p>
+      <p class="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">{subtitleCopy}</p>
       <div class="mt-4 flex items-center justify-between">
         <span id="inbox-unread-count" class="text-xs font-medium text-zinc-600 dark:text-zinc-400 tabular-nums"></span>
         <button
@@ -293,7 +293,7 @@ const subtitleCopy = lang === 'es'
           <div class="relative shrink-0">${icon}${avatar}</div>
           <div class="min-w-0 flex-1">
             <div class="text-sm leading-snug text-zinc-700 dark:text-zinc-300">${text}</div>
-            <div class="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-500">
+            <div class="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-600 dark:text-zinc-300">
               <span class="tabular-nums">${escapeText(when)}</span>
               ${unread ? `<span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-500" aria-label="${escapeText(lang === 'es' ? 'no leído' : 'unread')}"></span>` : ''}
             </div>

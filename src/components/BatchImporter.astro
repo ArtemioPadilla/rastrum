@@ -208,7 +208,7 @@ const ctText = (key: string, fallback: string): string => trapTr?.[key] ?? fallb
   function render() {
     if (!rowsHost) return;
     if (!rows.length) {
-      rowsHost.innerHTML = `<p class="text-sm text-zinc-500">${isEs ? 'Aún no has elegido fotos.' : 'No photos selected yet.'}</p>`;
+      rowsHost.innerHTML = `<p class="text-sm text-zinc-600 dark:text-zinc-300">${isEs ? 'Aún no has elegido fotos.' : 'No photos selected yet.'}</p>`;
       summaryBar?.classList.add('hidden');
       bulkPanel?.classList.add('hidden');
       if (importBtn) importBtn.disabled = true;
@@ -312,7 +312,7 @@ const ctText = (key: string, fallback: string): string => trapTr?.[key] ?? fallb
           <img src="${r.thumbUrl}" alt="" class="w-16 h-16 object-cover rounded shrink-0" loading="lazy" />
           <div class="min-w-0 flex-1">
             <p class="text-xs text-zinc-700 dark:text-zinc-300 truncate">${r.fileName}</p>
-            <p class="mt-1 text-[11px] text-zinc-500">${loc} · ${dt}</p>
+            <p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-300">${loc} · ${dt}</p>
             <div class="mt-2 flex items-center gap-3">
               <button data-edit="${r.id}" type="button" class="text-xs text-emerald-700 dark:text-emerald-400 underline">${isEs ? 'Editar' : 'Edit'}</button>
               <button data-toggle="${r.id}" type="button" class="text-xs ${r.excluded ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} underline">

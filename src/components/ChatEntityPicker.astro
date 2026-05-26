@@ -84,7 +84,7 @@ const labels = {
 
   async function refresh() {
     if (!list) return;
-    list.innerHTML = `<li class="text-xs text-zinc-500 italic">${LOADING}</li>`;
+    list.innerHTML = `<li class="text-xs text-zinc-600 dark:text-zinc-300 italic">${LOADING}</li>`;
     const sb = getSupabase();
     const q = lastQuery.trim();
     let rows: Array<{ id: string; label: string }> = [];
@@ -107,7 +107,7 @@ const labels = {
         const me = await getCachedUser();
         if (me) rows = [{ id: me.id, label: isEs ? 'Yo' : 'Me' }];
       } else if (activeTab === 'camera_station') {
-        list.innerHTML = `<li class="text-xs text-zinc-500 italic">${STATION}</li>`;
+        list.innerHTML = `<li class="text-xs text-zinc-600 dark:text-zinc-300 italic">${STATION}</li>`;
         return;
       }
     } catch (e) {
@@ -116,7 +116,7 @@ const labels = {
     }
 
     if (rows.length === 0) {
-      list.innerHTML = `<li class="text-xs text-zinc-500 italic">${EMPTY}</li>`;
+      list.innerHTML = `<li class="text-xs text-zinc-600 dark:text-zinc-300 italic">${EMPTY}</li>`;
       return;
     }
     const spec = registry.get(activeTab);

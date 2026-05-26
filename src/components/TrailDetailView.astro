@@ -152,11 +152,11 @@ const td = tr.trail_detail;
 
       const waypointRows = waypoints.map((wp, i) => `
         <tr class="border-t border-zinc-100 dark:border-zinc-800">
-          <td class="py-2 px-3 text-xs text-zinc-500">${i + 1}</td>
+          <td class="py-2 px-3 text-xs text-zinc-600 dark:text-zinc-300">${i + 1}</td>
           <td class="py-2 px-3 text-xs text-zinc-700 dark:text-zinc-300">${escapeHtml(wp.name ?? `WP ${i + 1}`)}</td>
-          <td class="py-2 px-3 text-xs font-mono text-zinc-500">${Number(wp.lat).toFixed(5)}</td>
-          <td class="py-2 px-3 text-xs font-mono text-zinc-500">${Number(wp.lng).toFixed(5)}</td>
-          <td class="py-2 px-3 text-xs text-zinc-500">${wp.obs_count ?? 0}</td>
+          <td class="py-2 px-3 text-xs font-mono text-zinc-600 dark:text-zinc-300">${Number(wp.lat).toFixed(5)}</td>
+          <td class="py-2 px-3 text-xs font-mono text-zinc-600 dark:text-zinc-300">${Number(wp.lng).toFixed(5)}</td>
+          <td class="py-2 px-3 text-xs text-zinc-600 dark:text-zinc-300">${wp.obs_count ?? 0}</td>
         </tr>
       `).join('');
 
@@ -176,20 +176,20 @@ const td = tr.trail_detail;
         <div class="flex flex-wrap gap-4">
           <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
             <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${trail.total_species}</p>
-            <p class="text-xs text-zinc-500 mt-0.5">${L.species}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">${L.species}</p>
           </div>
           <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
             <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">${trail.total_observations}</p>
-            <p class="text-xs text-zinc-500 mt-0.5">${L.observations}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">${L.observations}</p>
           </div>
           <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
             <p class="text-2xl font-bold text-zinc-700 dark:text-zinc-200">${waypoints.length}</p>
-            <p class="text-xs text-zinc-500 mt-0.5">${L.waypointsStat}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">${L.waypointsStat}</p>
           </div>
           ${trail.distance_km != null ? `
           <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
             <p class="text-2xl font-bold text-zinc-700 dark:text-zinc-200">${Number(trail.distance_km).toFixed(1)}</p>
-            <p class="text-xs text-zinc-500 mt-0.5">km</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">km</p>
           </div>` : ''}
         </div>
 
@@ -199,11 +199,11 @@ const td = tr.trail_detail;
           <table class="w-full text-left">
             <thead class="bg-zinc-50 dark:bg-zinc-800">
               <tr>
-                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">#</th>
-                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">${L.name}</th>
-                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">Lat</th>
-                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">Lng</th>
-                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">${L.obs}</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">#</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">${L.name}</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">Lat</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">Lng</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">${L.obs}</th>
               </tr>
             </thead>
             <tbody>

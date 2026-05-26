@@ -22,7 +22,7 @@ const queuePath = getLocalizedPath(lang, routes.exploreValidate[lang] + '/');
       {v.dashboard_title}
     </h1>
     <p class="text-sm text-zinc-600 dark:text-zinc-400">{v.dashboard_subtitle}</p>
-    <a href={profilePath} class="text-sm text-zinc-500 dark:text-zinc-500 hover:underline">
+    <a href={profilePath} class="text-sm text-zinc-600 dark:text-zinc-300 hover:underline">
       ← {tr.profile.view_profile}
     </a>
   </header>
@@ -35,20 +35,20 @@ const queuePath = getLocalizedPath(lang, routes.exploreValidate[lang] + '/');
     <div class="grid grid-cols-3 gap-3 mb-6">
       <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
         <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-suggestions">—</p>
-        <p class="text-xs text-zinc-500 mt-1">{v.stat_suggestions}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-1">{v.stat_suggestions}</p>
       </div>
       <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
         <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-research">—</p>
-        <p class="text-xs text-zinc-500 mt-1">{v.stat_research_grade}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-1">{v.stat_research_grade}</p>
       </div>
       <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
         <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-kingdoms">—</p>
-        <p class="text-xs text-zinc-500 mt-1">{v.stat_kingdoms}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-1">{v.stat_kingdoms}</p>
       </div>
     </div>
 
     <div class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center" id="vd-empty">
-      <p class="text-sm text-zinc-500 dark:text-zinc-400">{v.dashboard_empty}</p>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400">{v.dashboard_empty}</p>
       <a href={queuePath} class="mt-3 inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
         {v.go_to_queue}
       </a>

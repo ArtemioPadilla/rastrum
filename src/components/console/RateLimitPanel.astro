@@ -11,12 +11,12 @@ const isEs = lang === 'es';
     <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
       {isEs ? 'Estado de rate limits' : 'Rate limit status'}
     </h3>
-    <button id="ratelimit-refresh" type="button" class="text-xs text-zinc-500 hover:text-zinc-700 underline">
+    <button id="ratelimit-refresh" type="button" class="text-xs text-zinc-600 dark:text-zinc-300 hover:text-zinc-700 underline">
       {isEs ? 'Actualizar' : 'Refresh'}
     </button>
   </div>
 
-  <div id="ratelimit-loading" class="text-xs text-zinc-500 italic">
+  <div id="ratelimit-loading" class="text-xs text-zinc-600 dark:text-zinc-300 italic">
     {isEs ? 'Cargando...' : 'Loading...'}
   </div>
 
@@ -30,7 +30,7 @@ const isEs = lang === 'es';
 
   <div id="ratelimit-list" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
     <table class="min-w-full text-xs">
-      <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+      <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
         <tr>
           <th class="px-3 py-2">{isEs ? 'Actor' : 'Actor'}</th>
           <th class="px-3 py-2">{isEs ? 'Bucket' : 'Bucket'}</th>
@@ -97,7 +97,7 @@ const isEs = lang === 'es';
             <td class="px-3 py-2">${escapeHtml(String(row.bucket_name ?? ''))}</td>
             <td class="px-3 py-2 tabular-nums">${count}</td>
             <td class="px-3 py-2 tabular-nums">${limit}</td>
-            <td class="px-3 py-2 text-zinc-500">${escapeHtml(resetAt)}</td>
+            <td class="px-3 py-2 text-zinc-600 dark:text-zinc-300">${escapeHtml(resetAt)}</td>
             <td class="px-3 py-2 ${statusCls} font-medium">${statusLabel}</td>
           </tr>`;
         }).join('');

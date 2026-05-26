@@ -73,7 +73,7 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
         <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
           {anon.preview_label}
         </h2>
-        <span class="text-xs text-zinc-500 dark:text-zinc-400 hidden sm:inline">{anon.preview_hint}</span>
+        <span class="text-xs text-zinc-600 dark:text-zinc-400 hidden sm:inline">{anon.preview_hint}</span>
       </div>
       <div class="grid grid-cols-4 sm:grid-cols-6 gap-2" aria-hidden="true">
         {previewTiles.map(tile => (
@@ -85,7 +85,7 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
           ].join(' ')}></div>
         ))}
       </div>
-      <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400 sm:hidden">{anon.preview_hint}</p>
+      <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400 sm:hidden">{anon.preview_hint}</p>
     </section>
 
     <section class="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-6">
@@ -147,12 +147,12 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
           <h1 id="display-name" class="text-xl md:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 break-words">
             —
           </h1>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400 break-all">
+          <p class="text-sm text-zinc-600 dark:text-zinc-400 break-all">
             <span id="username-at">@—</span>
             <span id="region-sep" class="hidden"> · </span>
             <span id="region"></span>
           </p>
-          <p id="joined-date" class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 hidden"></p>
+          <p id="joined-date" class="text-xs text-zinc-400 dark:text-zinc-300 mt-0.5 hidden"></p>
           <p id="bio" class="mt-1 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
         </div>
 
@@ -203,15 +203,15 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
     <!-- Stats row -->
     <section class="grid grid-cols-3 gap-3 mb-8">      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-observations">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.total_observations}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{tr.profile.total_observations}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-watchlist">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'Seguimiento' : 'Watchlist'}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{lang === 'es' ? 'Seguimiento' : 'Watchlist'}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4" id="stat-streak-card">
         <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-streak">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'Racha diaria' : 'Day streak'}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">{lang === 'es' ? 'Racha diaria' : 'Day streak'}</p>
       </div>
     </section>
 
@@ -225,7 +225,7 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
       <div class="mt-3 space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
         <p id="freeze-last-used-line">{sfStr.ledger_never_used}</p>
         <p id="freeze-lifetime-line"></p>
-        <p class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-500 italic">{sfStr.tooltip_explanation}</p>
+        <p class="mt-2 text-[11px] text-zinc-600 dark:text-zinc-300 italic">{sfStr.tooltip_explanation}</p>
       </div>
     </details>
 
@@ -279,13 +279,13 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
       </h2>
       <div class="flex items-baseline gap-3">
         <span id="karma-total" class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">—</span>
-        <span class="text-xs text-zinc-500 dark:text-zinc-400">{k.total_label}</span>
+        <span class="text-xs text-zinc-600 dark:text-zinc-400">{k.total_label}</span>
         <span id="karma-weekly" class="ml-auto text-xs font-medium text-emerald-700 dark:text-emerald-400"></span>
       </div>
       <div>
         <h3 class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{k.expertise_heading}</h3>
         <ul id="karma-expertise-list" class="space-y-1 text-sm">
-          <li class="text-xs text-zinc-500 italic">{k.expertise_empty}</li>
+          <li class="text-xs text-zinc-600 dark:text-zinc-300 italic">{k.expertise_empty}</li>
         </ul>
       </div>
     </section>
@@ -298,27 +298,27 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <a href={importPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Importar fotos' : 'Import photos'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Desde carpeta' : 'From folder'}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Desde carpeta' : 'From folder'}</p>
         </a>
         <a href={cameraTrapPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Cámara trampa' : 'Camera trap'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Tarjeta de memoria' : 'Memory card'}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Tarjeta de memoria' : 'Memory card'}</p>
         </a>
         <a href={exportPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Exportar datos' : 'Export data'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">DwC-A, CSV, JSON</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">DwC-A, CSV, JSON</p>
         </a>
         <a href={tokensPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Tokens API' : 'API tokens'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Gestionar acceso' : 'Manage access'}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Gestionar acceso' : 'Manage access'}</p>
         </a>
         <a href={notificationsPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Notificaciones' : 'Notifications'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Push, correo, horas de silencio' : 'Push, email, quiet hours'}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Push, correo, horas de silencio' : 'Push, email, quiet hours'}</p>
         </a>
         <a href={impactPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Mi impacto' : 'My impact'}</p>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Datos abiertos, validación, conservación' : 'Open data, validation, conservation'}</p>
+          <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Datos abiertos, validación, conservación' : 'Open data, validation, conservation'}</p>
         </a>
       </div>
     </section>
@@ -345,7 +345,7 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
       <div id="recent-grid" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
 
       <div id="no-observations" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
         <a href={`/${lang}/${lang === 'es' ? 'observar' : 'observe'}/`} class="mt-3 inline-block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">
           {tr.profile.my_observations_cta}
         </a>
@@ -605,7 +605,7 @@ const previewTiles = Array.from({ length: 24 }, (_, i) => ({
             <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
               <div class="text-xs uppercase tracking-wider mb-1 ${tierColor(b.tier)} inline-block px-1.5 py-0.5 rounded">${b.tier}</div>
               <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${isEs ? b.name_es : b.name_en}</p>
-              <p class="text-xs text-zinc-500 capitalize">${b.category}</p>
+              <p class="text-xs text-zinc-600 dark:text-zinc-300 capitalize">${b.category}</p>
             </li>
           `).join('');
         }

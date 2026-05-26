@@ -243,7 +243,7 @@ const i18nBag = {
     }
     list.innerHTML = '';
     if (requests.length === 0) {
-      list.innerHTML = `<li class="text-zinc-500">${escHtml(i18nBag.my_requests_empty ?? '')}</li>`;
+      list.innerHTML = `<li class="text-zinc-600 dark:text-zinc-300">${escHtml(i18nBag.my_requests_empty ?? '')}</li>`;
       return;
     }
     const supabase = (await import('../lib/supabase')).getSupabase();
@@ -271,7 +271,7 @@ const i18nBag = {
       li.innerHTML = `
         <span>
           ${escHtml(name)}
-          <span class="ml-2 text-xs text-zinc-500">${escHtml(statusLabel[req.status] ?? req.status)}</span>
+          <span class="ml-2 text-xs text-zinc-600 dark:text-zinc-300">${escHtml(statusLabel[req.status] ?? req.status)}</span>
         </span>
         ${withdrawBtn}`;
       list.appendChild(li);

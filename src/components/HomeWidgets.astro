@@ -110,7 +110,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
         class="hw-suggestions-refresh hidden text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
       >{suggestions.refresh}</button>
     </div>
-    <p class="hw-suggestions-subtitle text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
+    <p class="hw-suggestions-subtitle text-xs text-zinc-600 dark:text-zinc-400 mb-3"></p>
     <button
       type="button"
       class="hw-suggestions-show inline-flex items-center gap-2 rounded-full border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
@@ -118,9 +118,9 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       <span aria-hidden="true">📍</span>
       <span>{suggestions.show ?? 'Show suggestions for my area'}</span>
     </button>
-    <p class="hw-suggestions-loading hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
-    <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
-    <p class="hw-suggestions-no-location hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.no_location}</p>
+    <p class="hw-suggestions-loading hidden text-sm text-zinc-600 dark:text-zinc-400">{suggestions.loading}</p>
+    <p class="hw-suggestions-empty hidden text-sm text-zinc-600 dark:text-zinc-400">{suggestions.empty}</p>
+    <p class="hw-suggestions-no-location hidden text-sm text-zinc-600 dark:text-zinc-400">{suggestions.no_location}</p>
     <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
   </div>
 
@@ -234,7 +234,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
           type="button"
           data-dismiss="${escapeText(s.taxon_id)}"
           aria-label="${escapeText(dismissLabel)}"
-          class="absolute top-1.5 right-1.5 rounded-full p-1 text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-200"
+          class="absolute top-1.5 right-1.5 rounded-full p-1 text-zinc-400 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
             <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
@@ -389,7 +389,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
           ${avatarHtml}
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
-            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeText(rankLabel)} · ${Math.round(r.karma_30d)} pts</p>
+            <p class="text-[11px] text-zinc-600 dark:text-zinc-400">${escapeText(rankLabel)} · ${Math.round(r.karma_30d)} pts</p>
           </div>
           <span class="text-xl">${medal}</span>
         </li>`;
@@ -478,7 +478,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
               <div class="flex-1 bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 overflow-hidden">
                 <div class="${barColor} h-full rounded-full" style="width:${pct}%"></div>
               </div>
-              <span class="text-[11px] text-zinc-500 dark:text-zinc-400 flex-shrink-0">${escapeText(progressLabel)}</span>
+              <span class="text-[11px] text-zinc-600 dark:text-zinc-400 flex-shrink-0">${escapeText(progressLabel)}</span>
             </div>
           </div>
         </div>`;
@@ -522,7 +522,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       const { data, error } = await supabase.rpc('daily_challenge_for_user', { p_user_id: userId });
       if (error || !data || (data as ChallengeRow[]).length === 0) {
         const emptyMsg = root.dataset.labelChallengeEmpty ?? 'No challenge available today.';
-        container.innerHTML = `<p class="text-sm text-zinc-500 dark:text-zinc-400">${escapeText(emptyMsg)}</p>`;
+        container.innerHTML = `<p class="text-sm text-zinc-600 dark:text-zinc-400">${escapeText(emptyMsg)}</p>`;
         container.classList.remove('hidden');
         return;
       }
@@ -579,7 +579,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
                 ${rarityLbl ? `<span class="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 flex-shrink-0"><span class="inline-block w-2 h-2 rounded-full ${rarityDot}"></span>${escapeText(rarityLbl)}</span>` : ''}
               </div>
               ${commonName ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate mb-1">${escapeText(commonName)}</p>` : ''}
-              ${ch.why ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2"><span class="font-medium">${escapeText(whyLabel)}:</span> ${escapeText(ch.why)}</p>` : ''}
+              ${ch.why ? `<p class="text-[11px] text-zinc-600 dark:text-zinc-400 mb-2"><span class="font-medium">${escapeText(whyLabel)}:</span> ${escapeText(ch.why)}</p>` : ''}
               ${ctaHtml}
             </div>
           </div>

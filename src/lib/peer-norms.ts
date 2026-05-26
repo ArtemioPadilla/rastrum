@@ -99,7 +99,7 @@ export function renderPeerNormHtml(
   copy: { withPct: (pct: string) => string; insufficient: string },
 ): string {
   if (result.pct === null) {
-    return `<span class="text-xs text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(copy.insufficient)}</span>`;
+    return `<span class="text-xs text-zinc-400 dark:text-zinc-300 italic">${escapeHtml(copy.insufficient)}</span>`;
   }
   const pctRounded = Math.round(result.pct * 10) / 10;
   const widthPct = Math.max(0, Math.min(100, result.pct));
@@ -109,7 +109,7 @@ export function renderPeerNormHtml(
       <span class="inline-block w-16 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden" aria-hidden="true">
         <span class="block h-full bg-emerald-500 dark:bg-emerald-400" style="width: ${widthPct}%"></span>
       </span>
-      <span class="text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(label)}</span>
+      <span class="text-xs text-zinc-600 dark:text-zinc-400">${escapeHtml(label)}</span>
     </span>
   `.trim();
 }

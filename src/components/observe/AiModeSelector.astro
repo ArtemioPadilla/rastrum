@@ -9,7 +9,7 @@ const isEs = lang === "es";
      option + disabled siblings reads as broken UI. -->
 <div id="obs2-ai-mode-selector" class="hidden">
   <div class="flex items-center gap-2 flex-wrap">
-    <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
+    <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
     <div class="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs" role="group" aria-label={isEs ? "Fuente de IA" : "AI source"}>
       <button type="button" id="obs2-mode-sponsored" data-mode="sponsored" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors">{isEs ? "Patrocinado" : "Sponsored"}</button>
       <button type="button" id="obs2-mode-own-key" data-mode="own-key" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">{isEs ? "Llave propia" : "Own key"}</button>

@@ -69,13 +69,13 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     <span>{tr.social.thread_locked_banner}</span>
   </div>
 
-  <div class="comments-loading text-sm text-zinc-500 dark:text-zinc-400 py-3">
+  <div class="comments-loading text-sm text-zinc-600 dark:text-zinc-400 py-3">
     {tr.social.loading}
   </div>
 
   <ul class="comments-list space-y-4 hidden"></ul>
 
-  <p class="comments-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+  <p class="comments-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
     {tr.social.empty_comments}
   </p>
 
@@ -97,7 +97,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
       maxlength="2000"
     ></textarea>
     <div class="flex items-center justify-between flex-wrap gap-2">
-      <p class="text-xs text-zinc-500">{tr.social.markdown_hint}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-300">{tr.social.markdown_hint}</p>
       <button
         type="submit"
         class="composer-submit inline-flex min-h-[44px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
@@ -163,7 +163,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     const isOwner = currentUserId && currentUserId === node.author_id;
     const indent = isReply ? 'ml-4 sm:ml-6' : '';
     const ownerActions = isOwner
-      ? `<div class="comment-actions mt-1 flex flex-wrap gap-3 text-xs text-zinc-500"><button type="button" class="action-edit underline-offset-2 hover:underline" data-id="${node.id}">${labels.edit}</button><button type="button" class="action-delete underline-offset-2 hover:underline text-red-600 dark:text-red-400" data-id="${node.id}">${labels.delete}</button></div>`
+      ? `<div class="comment-actions mt-1 flex flex-wrap gap-3 text-xs text-zinc-600 dark:text-zinc-300"><button type="button" class="action-edit underline-offset-2 hover:underline" data-id="${node.id}">${labels.edit}</button><button type="button" class="action-delete underline-offset-2 hover:underline text-red-600 dark:text-red-400" data-id="${node.id}">${labels.delete}</button></div>`
       : '';
     const replyAction = !isReply && currentUserId
       ? `<button type="button" class="action-reply text-xs text-emerald-700 dark:text-emerald-400 underline-offset-2 hover:underline mt-1" data-id="${node.id}">${labels.reply}</button>`
@@ -171,16 +171,16 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     // Overflow ⋮ — only for signed-in viewers, not on their own comments.
     const overflowHtml = (currentUserId && !isOwner)
       ? `<div class="comment-overflow relative shrink-0" data-author-id="${escapeText(node.author_id)}" data-author-handle="${escapeText(handle)}" data-comment-id="${escapeText(node.id)}">
-          <button type="button" class="comment-overflow-trigger inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors" aria-label="${escapeText(labels.moreActions)}" aria-haspopup="menu" aria-expanded="false">
+          <button type="button" class="comment-overflow-trigger inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors" aria-label="${escapeText(labels.moreActions)}" aria-haspopup="menu" aria-expanded="false">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
           </button>
           <div class="comment-overflow-menu hidden absolute right-0 top-8 z-30 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden" role="menu">
             <button type="button" class="comment-action-block flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockCommenterAria)}">
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
               <span>${escapeText(labels.block)}</span>
             </button>
             <button type="button" class="comment-action-report flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportCommentAria)}">
-              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <svg class="h-4 w-4 text-zinc-600 dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
               <span>${escapeText(labels.report)}</span>
             </button>
           </div>
@@ -197,7 +197,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
             <header class="flex items-start gap-2 text-sm">
               <div class="flex-1 min-w-0">
                 <span class="font-semibold text-zinc-900 dark:text-zinc-100">${escapeText(name)}</span>
-                <span class="text-zinc-500 ml-1">${ago}</span>
+                <span class="text-zinc-600 dark:text-zinc-300 ml-1">${ago}</span>
                 ${editedBadge}
               </div>
               ${overflowHtml}

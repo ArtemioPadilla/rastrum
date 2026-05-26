@@ -35,7 +35,7 @@ const year = Astro.url.searchParams.get('year') ?? new Date().getFullYear().toSt
             <div class="text-xs text-zinc-400 mt-1 uppercase tracking-wider">Species</div>
           </div>
         </div>
-        <button class="mt-8 text-xs text-zinc-500 animate-bounce">Scroll down ↓</button>
+        <button class="mt-8 text-xs text-zinc-600 dark:text-zinc-300 animate-bounce">Scroll down ↓</button>
       </section>
 
       <!-- Card 2: Top species -->
@@ -65,7 +65,7 @@ const year = Astro.url.searchParams.get('year') ?? new Date().getFullYear().toSt
       <section class="snap-start flex flex-col items-center justify-center min-h-screen p-8 bg-zinc-950">
         <h2 class="text-2xl font-bold mb-6">📷 Your most loved photo</h2>
         <div id="w-top-photo-container" class="w-full max-w-sm">
-          <p id="w-no-photo" class="text-zinc-500 text-sm">No photo data available.</p>
+          <p id="w-no-photo" class="text-zinc-600 dark:text-zinc-300 text-sm">No photo data available.</p>
           <a id="w-top-photo-link" href="#" class="hidden block">
             <img id="w-top-photo" src="" alt="Top photo" class="rounded-xl w-full object-cover max-h-64" />
           </a>

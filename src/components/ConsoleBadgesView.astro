@@ -42,8 +42,8 @@ const tr = t(lang);
           </select>
         </div>
       </div>
-      <div id="badges-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
-      <div id="badges-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.badges_empty}</div>
+      <div id="badges-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
+      <div id="badges-list-empty" class="hidden p-3 text-sm text-zinc-600 dark:text-zinc-300">{tr.console.badges_empty}</div>
       <ul id="badges-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
     </aside>
 
@@ -56,24 +56,24 @@ const tr = t(lang);
         <div id="badges-detail-icon" class="text-4xl w-14 h-14 flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800 shrink-0"></div>
         <div class="min-w-0">
           <div id="badges-detail-name-en" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
-          <div id="badges-detail-name-es" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
+          <div id="badges-detail-name-es" class="text-sm text-zinc-600 dark:text-zinc-400"></div>
           <div class="mt-1 flex gap-1.5" id="badges-detail-chips"></div>
         </div>
       </div>
 
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.badges_desc_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.badges_desc_heading}</h3>
         <p id="badges-detail-desc-en" class="text-sm text-zinc-700 dark:text-zinc-300 mb-1"></p>
-        <p id="badges-detail-desc-es" class="text-xs text-zinc-500 dark:text-zinc-500 italic"></p>
+        <p id="badges-detail-desc-es" class="text-xs text-zinc-600 dark:text-zinc-300 italic"></p>
       </div>
 
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.badges_criteria_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.badges_criteria_heading}</h3>
         <pre id="badges-detail-criteria" class="text-xs bg-zinc-50 dark:bg-zinc-900 rounded p-3 overflow-x-auto text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap"></pre>
       </div>
 
       <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.badges_holders_heading}</h3>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-2">{tr.console.badges_holders_heading}</h3>
         <div id="badges-detail-holders" class="text-sm text-zinc-700 dark:text-zinc-300"></div>
       </div>
 
@@ -101,12 +101,12 @@ const tr = t(lang);
       <div id="badges-award-form" class="hidden mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-3">
         <h4 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{tr.console.badges_award_slide_heading}</h4>
         <div>
-          <label class="block text-xs text-zinc-500 mb-1">{tr.console.badges_award_user_label}</label>
+          <label class="block text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.badges_award_user_label}</label>
           <input id="badges-award-target-user" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm font-mono" />
         </div>
         <div>
-          <label class="block text-xs text-zinc-500 mb-1">{tr.console.badges_award_reason_label}</label>
+          <label class="block text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.badges_award_reason_label}</label>
           <textarea id="badges-award-reason" rows="2" placeholder={tr.console.badges_award_reason_placeholder}
             class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
         </div>
@@ -126,7 +126,7 @@ const tr = t(lang);
 
   <!-- Tier distribution bar chart -->
   <div id="badges-chart" class="hidden mt-6">
-    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">{tr.console.badges_tier_dist_heading}</h3>
+    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-3">{tr.console.badges_tier_dist_heading}</h3>
     <div id="badges-chart-bars" class="flex gap-3 items-end h-16"></div>
   </div>
 
@@ -271,7 +271,7 @@ const tr = t(lang);
           <span class="font-medium text-sm text-zinc-900 dark:text-zinc-100">${escHtml(b.name_en)}</span>
           ${retired}
         </div>
-        <div class="text-xs text-zinc-500 mt-0.5 capitalize">${escHtml(b.category)}</div>
+        <div class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5 capitalize">${escHtml(b.category)}</div>
       </li>`;
     }).join('');
   }
@@ -324,9 +324,9 @@ const tr = t(lang);
       const h = Math.round((counts[tier] / max) * 60);
       const colorClass = TIER_COLORS[tier] ?? 'bg-zinc-400';
       return `<div class="flex flex-col items-center gap-1">
-        <span class="text-xs text-zinc-500">${counts[tier]}</span>
+        <span class="text-xs text-zinc-600 dark:text-zinc-300">${counts[tier]}</span>
         <div class="w-10 rounded-t ${colorClass}" style="height:${h}px"></div>
-        <span class="text-xs text-zinc-500 capitalize">${tier}</span>
+        <span class="text-xs text-zinc-600 dark:text-zinc-300 capitalize">${tier}</span>
       </div>`;
     }).join('');
   }

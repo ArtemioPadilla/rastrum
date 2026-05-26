@@ -35,18 +35,18 @@ const isEs = lang === 'es';
       </div>
     </div>
 
-    <div id="taxon-notes-loading" class="text-sm text-zinc-500 dark:text-zinc-400 italic">
+    <div id="taxon-notes-loading" class="text-sm text-zinc-600 dark:text-zinc-400 italic">
       {isEs ? 'Cargando notas…' : 'Loading notes…'}
     </div>
 
     <div id="taxon-notes-not-configured" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'La tabla de notas de taxón no está configurada aún.' : 'Taxon notes table not configured yet.'}
       </p>
     </div>
 
     <div id="taxon-notes-empty" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">
+      <p class="text-zinc-600 dark:text-zinc-400">
         {isEs ? 'No hay notas de taxón.' : 'No taxon notes found.'}
       </p>
     </div>
@@ -57,7 +57,7 @@ const isEs = lang === 'es';
       <button id="taxon-notes-prev" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         ←
       </button>
-      <span id="taxon-notes-page" class="text-zinc-500"></span>
+      <span id="taxon-notes-page" class="text-zinc-600 dark:text-zinc-300"></span>
       <button id="taxon-notes-next" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
         →
       </button>
@@ -141,7 +141,7 @@ const isEs = lang === 'es';
             <div class="flex items-center gap-2 text-sm">
               <span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(String(note.taxon_name ?? (isEs ? 'Sin nombre' : 'Unnamed')))}</span>
             </div>
-            <p class="text-xs text-zinc-500 mt-0.5 truncate">${escapeHtml(String(note.body ?? note.content ?? ''))}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5 truncate">${escapeHtml(String(note.body ?? note.content ?? ''))}</p>
             <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(date)}</p>
           </div>
         `;

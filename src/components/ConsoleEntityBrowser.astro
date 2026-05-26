@@ -58,7 +58,7 @@ const labelAny = (eb?.anyOption as string) ?? '— any —';
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="text-xl font-semibold mb-1">{title}</h1>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{description}</p>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl">{description}</p>
     </div>
   </header>
 
@@ -86,7 +86,7 @@ const labelAny = (eb?.anyOption as string) ?? '— any —';
       <div class="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
         <button id={`${prefix}-clear`} type="reset" class="px-2.5 py-1 rounded text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">{labelClear}</button>
         <div class="flex items-center gap-2">
-          <span id={`${prefix}-pagination-summary`} class="text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></span>
+          <span id={`${prefix}-pagination-summary`} class="text-xs text-zinc-600 dark:text-zinc-400" aria-live="polite"></span>
           <button id={`${prefix}-prev`} type="button" class="px-2.5 py-1 rounded text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>{labelPrev}</button>
           <button id={`${prefix}-next`} type="button" class="px-2.5 py-1 rounded text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>{labelNext}</button>
         </div>
@@ -109,7 +109,7 @@ const labelAny = (eb?.anyOption as string) ?? '— any —';
 
     <div id={`${prefix}-rows`} class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
       <table class="min-w-full text-sm">
-        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500 backdrop-blur">
+        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300 backdrop-blur">
           <tr>
             {columns.map(c => (
               <th class={`px-3 py-2 ${c.align === 'right' ? 'text-right' : ''}`}>{c.label}</th>

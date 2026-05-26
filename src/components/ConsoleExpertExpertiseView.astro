@@ -16,7 +16,7 @@ const tr = t(lang);
   </div>
 
   <div id="exp-skill-shell" class="hidden space-y-5">
-    <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_skill_intro}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400">{tr.console.exp_skill_intro}</p>
 
     <!-- Filters -->
     <div class="flex flex-wrap items-center gap-3">
@@ -33,12 +33,12 @@ const tr = t(lang);
     </div>
 
     <!-- Loading / error -->
-    <p id="exp-skill-loading" class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_skill_loading}</p>
+    <p id="exp-skill-loading" class="text-sm text-zinc-600 dark:text-zinc-400">{tr.console.exp_skill_loading}</p>
     <p id="exp-skill-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
     <!-- Kingdom chart -->
     <div id="exp-skill-chart-section" class="hidden">
-      <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">{tr.console.exp_skill_kingdom_chart_heading}</h3>
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400 mb-2">{tr.console.exp_skill_kingdom_chart_heading}</h3>
       <div id="exp-skill-chart" class="space-y-1.5"></div>
     </div>
 
@@ -46,7 +46,7 @@ const tr = t(lang);
     <div id="exp-skill-table-wrap" class="hidden overflow-x-auto">
       <table class="w-full text-sm border-collapse">
         <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-500">
+          <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-600 dark:text-zinc-300">
             <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_taxon}</th>
             <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_kingdom}</th>
             <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_score}</th>
@@ -60,7 +60,7 @@ const tr = t(lang);
     </div>
 
     <!-- Empty state -->
-    <div id="exp-skill-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
+    <div id="exp-skill-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-600 dark:text-zinc-300">
       {tr.console.exp_skill_empty}
     </div>
   </div>
@@ -107,7 +107,7 @@ const tr = t(lang);
     chartEl.innerHTML = sorted.map(([kingdom, score]) => {
       const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
       return `<div class="flex items-center gap-2 text-xs">
-        <span class="w-24 text-right text-zinc-500 dark:text-zinc-400 truncate">${kingdom}</span>
+        <span class="w-24 text-right text-zinc-600 dark:text-zinc-400 truncate">${kingdom}</span>
         <div class="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded h-4 overflow-hidden">
           <div class="h-full bg-emerald-500 rounded" style="width:${pct}%"></div>
         </div>
@@ -151,10 +151,10 @@ const tr = t(lang);
       const updated = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—';
       return `<tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
         <td class="py-2 pr-3 font-medium italic text-zinc-800 dark:text-zinc-200">${name}</td>
-        <td class="py-2 pr-3 text-zinc-500">${kingdom}</td>
+        <td class="py-2 pr-3 text-zinc-600 dark:text-zinc-300">${kingdom}</td>
         <td class="py-2 pr-3"><span class="${scoreBadgeClass(r.score)}">${score}</span></td>
         <td class="py-2 pr-3">${verified}</td>
-        <td class="py-2 text-zinc-500">${updated}</td>
+        <td class="py-2 text-zinc-600 dark:text-zinc-300">${updated}</td>
       </tr>`;
     }).join('');
   }

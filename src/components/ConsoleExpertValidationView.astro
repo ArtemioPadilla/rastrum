@@ -17,7 +17,7 @@ const tr = t(lang);
   </div>
 
   <div id="exp-val-shell" class="hidden space-y-4">
-    <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_val_intro}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400">{tr.console.exp_val_intro}</p>
 
     <!-- Filter toggle -->
     <div class="flex items-center gap-3">
@@ -36,14 +36,14 @@ const tr = t(lang);
     </div>
 
     <!-- Loading / error -->
-    <p id="exp-val-loading" class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_val_loading}</p>
+    <p id="exp-val-loading" class="text-sm text-zinc-600 dark:text-zinc-400">{tr.console.exp_val_loading}</p>
     <p id="exp-val-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
 
     <!-- Table -->
     <div id="exp-val-table-wrap" class="hidden overflow-x-auto">
       <table class="w-full text-sm border-collapse">
         <thead>
-          <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-500">
+          <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-600 dark:text-zinc-300">
             <th class="py-2 pr-3 font-medium">{tr.console.exp_val_col_taxon}</th>
             <th class="py-2 pr-3 font-medium">{tr.console.exp_val_col_confidence}</th>
             <th class="py-2 pr-3 font-medium">{tr.console.exp_val_col_suggestions}</th>
@@ -58,12 +58,12 @@ const tr = t(lang);
     </div>
 
     <!-- Empty state (unfiltered) -->
-    <div id="exp-val-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
+    <div id="exp-val-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-600 dark:text-zinc-300">
       {tr.console.exp_val_empty}
     </div>
 
     <!-- Empty state when "My taxa only" is active but matches nothing in a non-empty queue -->
-    <div id="exp-val-empty-filtered" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
+    <div id="exp-val-empty-filtered" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-600 dark:text-zinc-300">
       {tr.console.exp_val_empty_filtered}
     </div>
   </div>
@@ -186,10 +186,10 @@ const tr = t(lang);
       const voters = r.distinct_voter_count ?? 0;
       return `<tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
         <td class="py-2 pr-3 font-medium italic text-zinc-800 dark:text-zinc-200">${name}</td>
-        <td class="py-2 pr-3 text-zinc-500">${conf}</td>
-        <td class="py-2 pr-3 text-zinc-500">${suggestions}</td>
-        <td class="py-2 pr-3 text-zinc-500">${voters}</td>
-        <td class="py-2 pr-3 text-zinc-500 font-mono text-xs">${r.observer_id ? r.observer_id.slice(0, 8) + '…' : '—'}</td>
+        <td class="py-2 pr-3 text-zinc-600 dark:text-zinc-300">${conf}</td>
+        <td class="py-2 pr-3 text-zinc-600 dark:text-zinc-300">${suggestions}</td>
+        <td class="py-2 pr-3 text-zinc-600 dark:text-zinc-300">${voters}</td>
+        <td class="py-2 pr-3 text-zinc-600 dark:text-zinc-300 font-mono text-xs">${r.observer_id ? r.observer_id.slice(0, 8) + '…' : '—'}</td>
         <td class="py-2"><a href="${obsUrl}" class="text-xs text-emerald-700 dark:text-emerald-400 underline whitespace-nowrap">Open in queue →</a></td>
       </tr>`;
     }).join('');

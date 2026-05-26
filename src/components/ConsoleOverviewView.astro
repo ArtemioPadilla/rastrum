@@ -31,35 +31,35 @@ const tr = t(lang);
     <!-- KPI grid: 4 tiles per row on md+ -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_total_users}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_total_users}</p>
         <p id="admin-kpi-total-users" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_new_users_week}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_new_users_week}</p>
         <p id="admin-kpi-new-users" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_total_observations}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_total_observations}</p>
         <p id="admin-kpi-total-obs" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_research_grade_pct}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_research_grade_pct}</p>
         <p id="admin-kpi-rg-pct" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_sync_failures_24h}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_sync_failures_24h}</p>
         <p id="admin-kpi-sync-fail" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_active_bans}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_active_bans}</p>
         <p id="admin-kpi-active-bans" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_open_reports}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_open_reports}</p>
         <p id="admin-kpi-open-reports" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_pending_experts}</p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.admin_overview_kpi_pending_experts}</p>
         <p id="admin-kpi-pending-experts" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
     </div>
@@ -70,7 +70,7 @@ const tr = t(lang);
         {tr.console.overview_alerts_heading}
       </h2>
       <div id="admin-overview-alerts" class="space-y-2">
-        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
           {tr.console.overview_no_alerts}
         </div>
       </div>
@@ -82,7 +82,7 @@ const tr = t(lang);
         {tr.console.admin_overview_recent_heading}
       </h2>
       <div id="admin-overview-activity" class="space-y-1">
-        <p class="text-sm text-zinc-500">{tr.console.loading}</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-300">{tr.console.loading}</p>
       </div>
     </div>
   </div>
@@ -282,7 +282,7 @@ const tr = t(lang);
     const emptyText = section.dataset.recentEmpty ?? 'No admin actions logged yet.';
 
     if (auditError || !auditRows || auditRows.length === 0) {
-      activityEl.innerHTML = `<p class="text-sm text-zinc-500">${escHtml(emptyText)}</p>`;
+      activityEl.innerHTML = `<p class="text-sm text-zinc-600 dark:text-zinc-300">${escHtml(emptyText)}</p>`;
       return;
     }
 

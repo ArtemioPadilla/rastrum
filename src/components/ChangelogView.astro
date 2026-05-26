@@ -91,14 +91,14 @@ const changelog: ChangelogEntry[] = [
     <section class="mt-8">
       <h2 class="flex items-center gap-3">
         <span class="text-emerald-700 dark:text-emerald-400">v{entry.version}</span>
-        <span class="text-sm font-normal text-zinc-500">{entry.date}</span>
+        <span class="text-sm font-normal text-zinc-600 dark:text-zinc-300">{entry.date}</span>
       </h2>
       <ul>
         {entry.highlights.map(h => <li>{h}</li>)}
       </ul>
       {entry.prs.length > 0 && (
         <details class="mt-2">
-          <summary class="text-sm text-zinc-500 cursor-pointer">
+          <summary class="text-sm text-zinc-600 dark:text-zinc-300 cursor-pointer">
             {isEs ? `${entry.prs.length} pull requests` : `${entry.prs.length} pull requests`}
           </summary>
           <ul class="text-sm mt-1">

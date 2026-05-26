@@ -57,8 +57,8 @@ const tr = t(lang);
     <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4" style="height:calc(100vh - 240px)">
       <!-- Left: event list -->
       <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-        <div id="bioblitz-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
-        <div id="bioblitz-list-empty" class="hidden p-4 text-sm text-zinc-500">
+        <div id="bioblitz-list-loading" class="p-3 text-sm text-zinc-600 dark:text-zinc-300 italic">{tr.console.loading}</div>
+        <div id="bioblitz-list-empty" class="hidden p-4 text-sm text-zinc-600 dark:text-zinc-300">
           <p>{tr.console.bioblitz_no_events}</p>
           <p class="mt-2 text-xs text-zinc-400">{tr.console.bioblitz_create_hint}</p>
         </div>
@@ -76,22 +76,22 @@ const tr = t(lang);
         </div>
 
         <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_kind}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_kind}</dt>
           <dd id="bioblitz-detail-kind" class="font-medium text-zinc-800 dark:text-zinc-200 capitalize"></dd>
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_starts}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_starts}</dt>
           <dd id="bioblitz-detail-starts" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_ends}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_ends}</dt>
           <dd id="bioblitz-detail-ends" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_organiser}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_organiser}</dt>
           <dd id="bioblitz-detail-organiser" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_participants}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_participants}</dt>
           <dd id="bioblitz-detail-participants" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
-          <dt class="text-zinc-500">{tr.console.bioblitz_col_observations}</dt>
+          <dt class="text-zinc-600 dark:text-zinc-300">{tr.console.bioblitz_col_observations}</dt>
           <dd id="bioblitz-detail-obs" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
         </dl>
 
         <div id="bioblitz-detail-desc-block" class="hidden">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.bioblitz_desc_heading}</h3>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300 mb-1">{tr.console.bioblitz_desc_heading}</h3>
           <p id="bioblitz-detail-desc" class="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap"></p>
         </div>
 
@@ -146,7 +146,7 @@ const tr = t(lang);
   const STATUS_COLORS: Record<string, string> = {
     upcoming: 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300',
     active:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300',
-    past:     'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+    past:     'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300',
   };
 
   let allEvents: EventRow[] = [];
@@ -210,7 +210,7 @@ const tr = t(lang);
       const statusBadge = `<span class="text-[10px] rounded px-1.5 py-0.5 ${STATUS_COLORS[status]}">${status}</span>`;
       return `<li data-bioblitz-id="${escHtml(ev.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">${escHtml(ev.name)}</div>
-        <div class="text-xs text-zinc-500">${fmtDate(ev.starts_at)} – ${fmtDate(ev.ends_at)}</div>
+        <div class="text-xs text-zinc-600 dark:text-zinc-300">${fmtDate(ev.starts_at)} – ${fmtDate(ev.ends_at)}</div>
         <div class="mt-0.5 flex gap-1">${statusBadge}</div>
       </li>`;
     }).join('');
@@ -272,6 +272,7 @@ const tr = t(lang);
         btn.classList.toggle('font-medium', isActive);
         btn.classList.toggle('text-zinc-700', isActive);
         btn.classList.toggle('text-zinc-600', !isActive);
+        btn.classList.toggle('dark:text-zinc-300', !isActive);
       });
       applyFilter();
     }

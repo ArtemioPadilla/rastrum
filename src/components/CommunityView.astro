@@ -109,7 +109,7 @@ const stringsJson = JSON.stringify({
     </div>
     <a
       href={editProfileHref}
-      class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline whitespace-nowrap"
+      class="text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 underline whitespace-nowrap"
     >
       {cm.leaderboards_optout_link} ↗
     </a>
@@ -176,15 +176,15 @@ const stringsJson = JSON.stringify({
 
   <p
     id="cf-location-status"
-    class="hidden mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+    class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400"
     aria-live="polite"
   ></p>
 
   <div id="community-list" class="mt-4 space-y-2">
-    <p class="text-sm text-zinc-500 italic" data-loading>{cm.loading}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-300 italic" data-loading>{cm.loading}</p>
   </div>
 
-  <div id="community-empty" class="hidden mt-8 text-center text-sm text-zinc-500"></div>
+  <div id="community-empty" class="hidden mt-8 text-center text-sm text-zinc-600 dark:text-zinc-300"></div>
 
   <aside
     id="community-privacy-banner"
@@ -208,7 +208,7 @@ const stringsJson = JSON.stringify({
     >
       ← {cm.previous}
     </button>
-    <span id="cf-page" class="text-zinc-500"></span>
+    <span id="cf-page" class="text-zinc-600 dark:text-zinc-300"></span>
     <button
       id="cf-next"
       class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50"
@@ -378,10 +378,10 @@ const stringsJson = JSON.stringify({
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
           <a href="${profileHref}" class="text-sm font-semibold text-zinc-800 dark:text-zinc-100 truncate">@${escapeHtml(handle)}</a>
-          ${row.display_name ? `<span class="text-xs text-zinc-500 dark:text-zinc-400 truncate">· ${escapeHtml(row.display_name)}</span>` : ''}
+          ${row.display_name ? `<span class="text-xs text-zinc-600 dark:text-zinc-400 truncate">· ${escapeHtml(row.display_name)}</span>` : ''}
           ${row.is_expert ? `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">${escapeHtml(STRINGS.expertPill)}</span>` : ''}
         </div>
-        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+        <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400 truncate">
           ${row.country_code ? escapeHtml(row.country_code) + ' · ' : ''}${escapeHtml(taxaList)}
         </p>
         <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
@@ -400,7 +400,7 @@ const stringsJson = JSON.stringify({
   writeUI(filters);
 
   function showLoading(): void {
-    list!.innerHTML = `<p class="text-sm text-zinc-500 italic" data-loading>${escapeHtml(STRINGS.loading)}</p>`;
+    list!.innerHTML = `<p class="text-sm text-zinc-600 dark:text-zinc-300 italic" data-loading>${escapeHtml(STRINGS.loading)}</p>`;
     empty!.classList.add('hidden');
     pager!.classList.add('hidden');
     privacyBanner!.classList.add('hidden');
@@ -481,7 +481,8 @@ const stringsJson = JSON.stringify({
     locationStatus!.classList.toggle('dark:text-amber-400', tone === 'warn');
     locationStatus!.classList.toggle('text-emerald-700', tone === 'info');
     locationStatus!.classList.toggle('dark:text-emerald-400', tone === 'info');
-    locationStatus!.classList.toggle('text-zinc-500', false);
+    locationStatus!.classList.toggle('text-zinc-600', false);
+    locationStatus!.classList.toggle('dark:text-zinc-300', false);
     locationStatus!.classList.toggle('dark:text-zinc-400', false);
   }
 
