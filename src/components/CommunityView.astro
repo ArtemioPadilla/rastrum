@@ -481,7 +481,8 @@ const stringsJson = JSON.stringify({
     locationStatus!.classList.toggle('dark:text-amber-400', tone === 'warn');
     locationStatus!.classList.toggle('text-emerald-700', tone === 'info');
     locationStatus!.classList.toggle('dark:text-emerald-400', tone === 'info');
-    locationStatus!.classList.toggle('text-zinc-600 dark:text-zinc-300', false);
+    locationStatus!.classList.toggle('text-zinc-600', false);
+    locationStatus!.classList.toggle('dark:text-zinc-300', false);
     locationStatus!.classList.toggle('dark:text-zinc-400', false);
   }
 

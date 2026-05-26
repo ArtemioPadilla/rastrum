@@ -271,7 +271,8 @@ const tr = t(lang);
         btn.classList.toggle('dark:bg-zinc-800', isActive);
         btn.classList.toggle('font-medium', isActive);
         btn.classList.toggle('text-zinc-700', isActive);
-        btn.classList.toggle('text-zinc-600 dark:text-zinc-300', !isActive);
+        btn.classList.toggle('text-zinc-600', !isActive);
+        btn.classList.toggle('dark:text-zinc-300', !isActive);
       });
       applyFilter();
     }

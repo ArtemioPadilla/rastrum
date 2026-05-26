@@ -501,7 +501,8 @@ function applyChipStyles(active: TaxonHint | null): void {
     chip.classList.toggle('border-emerald-600', isActive);
     chip.classList.toggle('border-zinc-300', !isActive);
     chip.classList.toggle('dark:border-zinc-600', !isActive);
-    chip.classList.toggle('text-zinc-600 dark:text-zinc-300', !isActive);
+    chip.classList.toggle('text-zinc-600', !isActive);
+    chip.classList.toggle('dark:text-zinc-300', !isActive);
     chip.classList.toggle('dark:text-zinc-400', !isActive);
   });
 }

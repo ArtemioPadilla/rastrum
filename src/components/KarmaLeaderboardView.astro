@@ -645,7 +645,7 @@ const stringsJson = JSON.stringify({
 
   function showLoading() {
     loadingEl!.classList.remove('hidden', 'text-red-600');
-    loadingEl!.classList.add('text-zinc-600 dark:text-zinc-300');
+    loadingEl!.classList.add('text-zinc-600', 'dark:text-zinc-300');
     loadingEl!.textContent = STRINGS.loading;
     emptyEl!.classList.add('hidden');
     tableWrap!.classList.add('hidden');
@@ -976,7 +976,7 @@ const stringsJson = JSON.stringify({
       loadingEl!.classList.remove('hidden');
       loadingEl!.textContent = err instanceof Error ? err.message : String(err);
       loadingEl!.classList.add('text-red-600');
-      loadingEl!.classList.remove('text-zinc-600 dark:text-zinc-300');
+      loadingEl!.classList.remove('text-zinc-600', 'dark:text-zinc-300');
     }
   }
 
@@ -1052,7 +1052,7 @@ const stringsJson = JSON.stringify({
       loadingEl!.classList.remove('hidden');
       loadingEl!.textContent = err instanceof Error ? err.message : String(err);
       loadingEl!.classList.add('text-red-600');
-      loadingEl!.classList.remove('text-zinc-600 dark:text-zinc-300');
+      loadingEl!.classList.remove('text-zinc-600', 'dark:text-zinc-300');
     }
   }
 

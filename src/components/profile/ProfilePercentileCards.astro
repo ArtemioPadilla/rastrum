@@ -161,7 +161,8 @@ const scopeStateLabel     = tp.scope_state_label   ?? (lang === 'es' ? 'Estado' 
       btn.classList.toggle('dark:text-emerald-300', active);
       btn.classList.toggle('border-zinc-300', !active);
       btn.classList.toggle('bg-transparent', !active);
-      btn.classList.toggle('text-zinc-600 dark:text-zinc-300', !active);
+      btn.classList.toggle('text-zinc-600', !active);
+      btn.classList.toggle('dark:text-zinc-300', !active);
       btn.classList.toggle('dark:border-zinc-600', !active);
       btn.classList.toggle('dark:text-zinc-400', !active);
     });

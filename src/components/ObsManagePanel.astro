@@ -357,7 +357,8 @@ const observe = tr.observe;
         b.classList.toggle('text-emerald-700', active);
         b.classList.toggle('dark:text-emerald-400', active);
         b.classList.toggle('border-transparent', !active);
-        b.classList.toggle('text-zinc-600 dark:text-zinc-300', !active);
+        b.classList.toggle('text-zinc-600', !active);
+        b.classList.toggle('dark:text-zinc-300', !active);
         b.classList.toggle('dark:text-zinc-400', !active);
         if (active && focus) b.focus();
       }
