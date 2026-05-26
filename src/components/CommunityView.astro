@@ -73,6 +73,7 @@ const stringsJson = JSON.stringify({
   obsTpl: cm.card.obs,
   speciesTpl: cm.card.species,
   lastSeenTpl: cm.card.last_seen,
+  profileLinkAriaTpl: cm.card.profile_link_aria ?? 'Open profile: {name}',
   loading: cm.loading,
   emptyNoMatch: cm.empty.no_match,
   emptyNoMatchFilters: cm.empty.no_match_filters,
@@ -196,7 +197,8 @@ const stringsJson = JSON.stringify({
       href={editProfileHref}
       class="inline-block text-emerald-700 dark:text-emerald-400 font-medium hover:underline"
       data-privacy-cta
-    ></a>
+      aria-label={cm.empty.privacy_explainer.cta_edit_profile}
+    >{cm.empty.privacy_explainer.cta_edit_profile}</a>
   </aside>
 
   <nav id="community-pager" class="hidden mt-6 flex items-center justify-between text-sm">
@@ -233,6 +235,7 @@ const stringsJson = JSON.stringify({
     obsTpl: string;
     speciesTpl: string;
     lastSeenTpl: string;
+    profileLinkAriaTpl: string;
     loading: string;
     emptyNoMatch: string;
     emptyNoMatchFilters: string;
@@ -363,10 +366,11 @@ const stringsJson = JSON.stringify({
 
     const karmaRingTier = tierForKarma(row.karma_total ?? 0);
     const karmaRingClass = karmaRingTier.staticRingClass ?? karmaRingTier.ringClass;
+    const profileAriaLabel = STRINGS.profileLinkAriaTpl.replace('{name}', displayName);
     const el = document.createElement('article');
     el.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 flex items-start gap-3';
     el.innerHTML = `
-      <a href="${profileHref}" class="flex-none">
+      <a href="${profileHref}" class="flex-none" aria-label="${escapeHtml(profileAriaLabel)}">
         ${row.avatar_url
           ? `<span class="inline-block rounded-full ring-offset-1 ring-offset-white dark:ring-offset-zinc-900 ${escapeHtml(karmaRingClass)}"><img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover block"></span>`
           : `<div class="w-12 h-12 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`}
