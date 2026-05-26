@@ -72,6 +72,8 @@ const distancePage = page as unknown as Record<string, string>;
   data-label-distance-no-location={distancePage.distance_filter_no_location ?? 'Enable location to filter by distance'}
   data-label-distance-locating={distancePage.distance_filter_locating ?? 'Getting your location…'}
   data-label-distance-show={distancePage.distance_filter_show ?? 'Show observations near me'}
+  data-label-observation-link-aria={distancePage.observation_link_aria ?? 'Open observation: {species}'}
+  data-label-profile-link-aria={distancePage.profile_link_aria ?? 'Open profile: {name}'}
 >
   <header class="space-y-3 py-6">
     <div class="flex items-start justify-between gap-3">
@@ -344,8 +346,9 @@ const distancePage = page as unknown as Record<string, string>;
       ? `<img src="${escapeText(avatarUrl)}" alt="" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'text-[8px] font-bold text-emerald-700 dark:text-emerald-300\'>${escapeText(initials)}</span>'" />`
       : `<span class="text-[8px] font-bold text-emerald-700 dark:text-emerald-300">${escapeText(initials)}</span>`;
     const avatarWrapClass = `er-observer-avatar inline-flex h-5 w-5 shrink-0 rounded-full items-center justify-center overflow-hidden bg-emerald-100 dark:bg-emerald-950 ${karmaRingClass} ring-offset-1 ring-offset-white dark:ring-offset-zinc-900`;
+    const avatarAriaLabel = labels.profileLinkAria.replace('{name}', observerName || observerUsername);
     const avatarHtml = isPublic && observerUsername
-      ? `<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="shrink-0" tabindex="-1" aria-hidden="true"><span class="${avatarWrapClass}">${avatarImgHtml}</span></a>`
+      ? `<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="shrink-0" tabindex="-1" aria-label="${escapeText(avatarAriaLabel)}"><span class="${avatarWrapClass}">${avatarImgHtml}</span></a>`
       : '';
 
     const observerHtml = isPublic && observerUsername
@@ -420,11 +423,13 @@ const distancePage = page as unknown as Record<string, string>;
         : imgTag;
     }
 
+    const obsAriaLabel = labels.observationLinkAria.replace('{species}', sci);
     return `<li class="relative">
       ${overflowHtml}
       <a
         href="${shareBase}?id=${encodeURIComponent(r.id)}"
         class="er-card block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
+        aria-label="${escapeText(obsAriaLabel)}"
       >
         <div class="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
           ${photo
@@ -476,6 +481,8 @@ const distancePage = page as unknown as Record<string, string>;
       faveAriaOther: root.dataset.labelFaveAriaOther ?? '{{count}} people favorited this',
       timelineToday: root.dataset.labelTimelineToday ?? (lang === 'es' ? 'Hoy' : 'Today'),
       timelineYesterday: root.dataset.labelTimelineYesterday ?? (lang === 'es' ? 'Ayer' : 'Yesterday'),
+      observationLinkAria: root.dataset.labelObservationLinkAria ?? 'Open observation: {species}',
+      profileLinkAria: root.dataset.labelProfileLinkAria ?? 'Open profile: {name}',
     };
 
     const listEl = root.querySelector('.er-list') as HTMLUListElement | null;
@@ -674,7 +681,8 @@ const distancePage = page as unknown as Record<string, string>;
         : hasAudioOnly
           ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" role="img" aria-label="Audio observation"><svg class="w-5 h-5 text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
           : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="No photo"><svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`;
-      return `<a href="${shareBase}?id=${encodeURIComponent(r.id)}" class="flex items-center gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors px-3 py-2">
+      const listObsAriaLabel = labels.observationLinkAria.replace('{species}', sciText);
+      return `<a href="${shareBase}?id=${encodeURIComponent(r.id)}" class="flex items-center gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors px-3 py-2" aria-label="${escapeText(listObsAriaLabel)}">
         ${thumb}
         <div class="min-w-0 flex-1">
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sciText)}</p>
