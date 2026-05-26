@@ -124,7 +124,14 @@ const stringsJson = JSON.stringify({
   </div>
 </section>
 
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
+<!-- PBI 5.4 — defer MapLibre CSS off the critical path; see MapPicker.astro. -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css"
+  media="print"
+  onload="this.media='all'; this.onload=null;"
+/>
+<noscript><link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" /></noscript>
 
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';

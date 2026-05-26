@@ -150,7 +150,19 @@ const initialLng  = initialCoords?.lng ?? '';
   </>
 )}
 
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
+<!-- PBI 5.4 — defer MapLibre CSS off the critical path. The map mounts
+     client-side after the layout has painted, so its stylesheet does not
+     need to block first paint. `media="print"` skips the render-blocking
+     parse; `onload` swaps it back to `all` once the network fetch
+     resolves. The `<noscript>` fallback keeps the page styled for users
+     with JS disabled. -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css"
+  media="print"
+  onload="this.media='all'; this.onload=null;"
+/>
+<noscript><link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" /></noscript>
 
 <script>
   import { MEXICO_DEFAULT_CENTER, isValidLatLng } from '../lib/media-helpers';

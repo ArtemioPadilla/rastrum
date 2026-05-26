@@ -338,32 +338,44 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
         of the API just means manual override is the only path. We never
         prompt for permission unconditionally — the sensor is constructed
         in a try/catch and we listen for SecurityError to back off silently.
+
+        PBI 5.4 — deferred off the critical path via requestIdleCallback.
+        First paint never depends on this probe; we run it once the main
+        thread is idle so it doesn't compete with the theme/field/seasonal
+        boot scripts above.
       */
       (function () {
-        var FIELD_LUX = 5000;
-        var stored = localStorage.getItem('theme');
-        if (stored && stored !== 'auto') return;
-        if (typeof AmbientLightSensor === 'undefined') return;
-        try {
-          var sensor = new AmbientLightSensor({ frequency: 1 });
-          sensor.addEventListener('reading', function () {
-            var lux = sensor.illuminance;
-            if (typeof lux !== 'number') return;
-            var current = localStorage.getItem('theme');
-            if (current && current !== 'auto') return;
-            var el = document.documentElement.classList;
-            if (lux > FIELD_LUX) {
-              el.add('dark'); el.add('field');
-            } else if (el.contains('field')) {
-              el.remove('field');
-              var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-              if (!prefersDark) el.remove('dark');
-            }
-          });
-          sensor.addEventListener('error', function () { /* permission denied or unavailable */ });
-          sensor.start();
-        } catch (e) {
-          /* ReferenceError, SecurityError, NotSupportedError — manual-only fallback */
+        function runAmbientLightProbe() {
+          var FIELD_LUX = 5000;
+          var stored = localStorage.getItem('theme');
+          if (stored && stored !== 'auto') return;
+          if (typeof AmbientLightSensor === 'undefined') return;
+          try {
+            var sensor = new AmbientLightSensor({ frequency: 1 });
+            sensor.addEventListener('reading', function () {
+              var lux = sensor.illuminance;
+              if (typeof lux !== 'number') return;
+              var current = localStorage.getItem('theme');
+              if (current && current !== 'auto') return;
+              var el = document.documentElement.classList;
+              if (lux > FIELD_LUX) {
+                el.add('dark'); el.add('field');
+              } else if (el.contains('field')) {
+                el.remove('field');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (!prefersDark) el.remove('dark');
+              }
+            });
+            sensor.addEventListener('error', function () { /* permission denied or unavailable */ });
+            sensor.start();
+          } catch (e) {
+            /* ReferenceError, SecurityError, NotSupportedError — manual-only fallback */
+          }
+        }
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(runAmbientLightProbe, { timeout: 2000 });
+        } else {
+          setTimeout(runAmbientLightProbe, 1000);
         }
       })();
     </script>
