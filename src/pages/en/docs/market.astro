@@ -22,7 +22,7 @@ const matrix = [
 function cellDisplay(v: boolean | string) {
   if (v === true)      return { text: '\u2713', cls: 'text-emerald-600 dark:text-emerald-400 font-bold' };
   if (v === 'partial') return { text: '~',      cls: 'text-yellow-600 dark:text-yellow-400' };
-  return                       { text: '\u2717', cls: 'text-zinc-600 dark:text-zinc-400 dark:text-zinc-600' };
+  return                       { text: '\u2717', cls: 'text-zinc-600 dark:text-zinc-600 dark:text-zinc-400' };
 }
 ---
 
@@ -30,7 +30,7 @@ function cellDisplay(v: boolean | string) {
   <article class="space-y-8">
     <div>
       <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.market}</h1>
-      <p class="text-lg text-zinc-600 dark:text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.market}</p>
+      <p class="text-lg text-zinc-600 dark:text-zinc-300 max-w-3xl">{tr.docs.descriptions.market}</p>
     </div>
 
     <!-- Competitive Matrix -->
@@ -63,12 +63,12 @@ function cellDisplay(v: boolean | string) {
             ))}
           </tbody>
         </table>
-        <p class="text-xs text-zinc-600 dark:text-zinc-400 dark:text-zinc-600 mt-2">
+        <p class="text-xs text-zinc-600 dark:text-zinc-600 dark:text-zinc-400 mt-2">
           <span class="text-emerald-600 dark:text-emerald-400 font-bold">{'\u2713'}</span> full support
           <span class="mx-2 text-zinc-700 dark:text-zinc-300 dark:text-zinc-700">|</span>
           <span class="text-yellow-600 dark:text-yellow-400">~</span> partial
           <span class="mx-2 text-zinc-700 dark:text-zinc-300 dark:text-zinc-700">|</span>
-          <span class="text-zinc-600 dark:text-zinc-400 dark:text-zinc-600">{'\u2717'}</span> not supported
+          <span class="text-zinc-600 dark:text-zinc-600 dark:text-zinc-400">{'\u2717'}</span> not supported
         </p>
       </div>
     </section>

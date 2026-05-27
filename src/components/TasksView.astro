@@ -172,11 +172,11 @@ const updated = isEs ? 'Actualizado' : 'Updated';
                     <span class:list={[
                       "text-sm font-semibold",
                       prog.pct === 100 ? "text-sky-600 dark:text-sky-400" :
-                      prog.pct > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-600"
+                      prog.pct > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-400"
                     ]}>
                       {prog.done}/{prog.total}
                     </span>
-                    <p class="text-xs text-zinc-400 dark:text-zinc-600">{isEs ? 'subtareas' : 'subtasks'}</p>
+                    <p class="text-xs text-zinc-600 dark:text-zinc-400">{isEs ? 'subtareas' : 'subtasks'}</p>
                   </div>
                 </summary>
 
@@ -217,7 +217,7 @@ const updated = isEs ? 'Actualizado' : 'Updated';
     );
   })}
 
-  <p class="text-xs text-zinc-600 dark:text-zinc-600 mt-8">
+  <p class="text-xs text-zinc-600 dark:text-zinc-300 mt-8">
     {isEs ? 'Edita ' : 'Edit '}<code class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">docs/tasks.json</code>
     {isEs ? ' para actualizar. La página se reconstruye en cada push.' : ' to update. The page rebuilds on every push.'}
   </p>

@@ -291,7 +291,7 @@ const heroSub = isEs
         </span>
         <div>
           <h2 id={s.id} class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <span class="text-zinc-400 dark:text-zinc-600 font-mono text-base">{String(idx + 1).padStart(2, '0')}</span>
+            <span class="text-zinc-600 dark:text-zinc-400 font-mono text-base">{String(idx + 1).padStart(2, '0')}</span>
             <a href={`#${s.id}`} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{s.title}</a>
           </h2>
           <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-2xl mt-1 leading-relaxed">{s.blurb}</p>
@@ -308,7 +308,7 @@ const heroSub = isEs
     </section>
   ))}
 
-  <p class="text-xs text-zinc-600 dark:text-zinc-600 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+  <p class="text-xs text-zinc-600 dark:text-zinc-300 pt-4 border-t border-zinc-200 dark:border-zinc-800">
     {isEs
       ? 'Fuente de la verdad: docs/progress.json (v0.1 → v1.0 ítems hechos), src/lib/identifiers/index.ts (plugins registrados) y supabase/functions/ (Edge Functions desplegadas).'
       : 'Source of truth: docs/progress.json (v0.1 → v1.0 done items), src/lib/identifiers/index.ts (registered plugins), and supabase/functions/ (deployed Edge Functions).'}
