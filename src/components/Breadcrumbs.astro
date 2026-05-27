@@ -88,7 +88,7 @@ if (isDocsPage && docSlug) {
   <nav aria-label="Breadcrumb" class="text-xs text-zinc-600 dark:text-zinc-400 mb-4 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
     {trail.map((crumb, i) => (
       <>
-        {i > 0 && <span class="text-zinc-400 dark:text-zinc-600 select-none" aria-hidden="true">›</span>}
+        {i > 0 && <span class="text-zinc-600 dark:text-zinc-400 select-none" aria-hidden="true">›</span>}
         {crumb.href ? (
           <a href={crumb.href} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shrink-0">{crumb.label}</a>
         ) : (
