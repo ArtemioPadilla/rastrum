@@ -162,7 +162,7 @@ docs/
 - **No `console.log` in shipped code.** `console.warn` for genuinely
   exceptional ignored errors only.
 - **Below-fold images use `loading="lazy"`.** The hero / first-paint image stays default-loaded for LCP; everything below the fold (doc screenshots, observation thumbnails, profile avatars in lists) gets `loading="lazy"`.
-- **Body copy minimum contrast = `text-zinc-600` / `dark:text-zinc-300` (4.5:1, WCAG AA).** `text-zinc-500` over white is ~3.2:1 and fails. `dark:text-zinc-500` over `bg-zinc-900` is ~3.5:1 and also fails. Regression-guarded by `tests/unit/color-contrast-policy.test.ts` (PBI 3.1).
+- **Body copy minimum contrast = `text-zinc-600` / `dark:text-zinc-300` (4.5:1, WCAG AA).** `text-zinc-500` over white is ~3.2:1 and fails. `dark:text-zinc-500` over `bg-zinc-900` is ~3.5:1 and also fails. Same applies to error states: any `text-red-(500|600|700)` must carry a `dark:text-red-400` (or `-300`) variant — `text-red-600` on `bg-zinc-900` is only 4.1:1. For brand emerald buttons with white text, use `bg-emerald-700` or darker (`bg-emerald-600` + white text is 3.76:1). Regression-guarded by `tests/unit/color-contrast-policy.test.ts` (PBI 3.1 / 3.1.2). For mechanical Tailwind class sweeps that change tokens used in JS (`classList.toggle('text-X', cond)`), see the `tailwind-sweep-classlist-trap` memory — single-token strings only.
 
 ### Astro JSX gotcha — `Record<…>` is parsed as a tag
 Inline TypeScript casts like `(foo as Record<string, unknown>).bar` inside
