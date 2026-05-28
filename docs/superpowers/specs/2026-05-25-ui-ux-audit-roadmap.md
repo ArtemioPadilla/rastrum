@@ -71,7 +71,7 @@ Epic-3 PBIs are 1–2 days. The 78-point total is a planning estimate
 | 🟢 | Done (PR merged + audit re-run confirms target met) |
 | ⚪ | Deferred (linked issue, outside this roadmap) |
 
-All 17 PBIs in this roadmap are currently 🔴.
+**Status as of 2026-05-28: 16 🟢 shipped / 1 ⚪ closed as not-a-defect.**
 
 ---
 
@@ -126,7 +126,7 @@ graph LR
   reference memory `reference_observeview2_script_e2e_gate` mandates a
   Playwright run before declaring done.
 
-### PBI 1.1 — Cookie banner: collapse to bottom-sheet pattern · 🔴
+### PBI 1.1 — Cookie banner: collapse to bottom-sheet pattern · 🟢 (#1195)
 
 **Why.** Banner persistently covers the **Record Observation** CTA on
 home mobile, the form on `/observar/` mobile, footer copy on
@@ -161,7 +161,7 @@ shows CTA in above-the-fold viewport for `/en/` home on mobile.
 
 ---
 
-### PBI 1.2 — OnboardingTour tooltip positioning bug on `/observe/` · 🔴
+### PBI 1.2 — OnboardingTour tooltip positioning bug on `/observe/` · 🟢 (#1199)
 
 **Why.** Tooltip *"Rastrum identifies species automatically…"* overlays
 the **Observe** nav link on desktop and the **Sign in** button on mobile.
@@ -193,7 +193,7 @@ all 7 steps shows no overlap; e2e suite green.
 
 ---
 
-### PBI 1.3 — Defer geolocation requests behind explicit action · 🔴
+### PBI 1.3 — Defer geolocation requests behind explicit action · 🟢 (#1197)
 
 **Why.** Lighthouse `geolocation-on-start` flagged on `/en/`, `/es/`,
 and `/en/explore/recent/`. Asking for location permission on page load
@@ -241,7 +241,7 @@ any home widget that triggers the prompt (search via `grep -r
   emits AVIF/WebP variants before assuming an `astro:image` config swap
   is sufficient.
 
-### PBI 2.1 — `/explore/recent/` LCP overhaul · 🔴
+### PBI 2.1 — `/explore/recent/` LCP overhaul · 🟢 (#1206)
 
 **Why.** Lighthouse on this page: **LCP 1481 ms** (3× slower than other
 pages), LCP image was **lazy-loaded** (a priority bug), 2729 KiB total
@@ -277,7 +277,7 @@ variants per CLAUDE.md M03).
 
 ---
 
-### PBI 2.2 — Bundle hygiene: unused CSS purge + per-route code split · 🔴
+### PBI 2.2 — Bundle hygiene: unused CSS purge + per-route code split · 🟢 (#1204)
 
 **Why.** Lighthouse flags ~13 KiB unused CSS + ~40 KiB unused JS on
 **every** page (201 KiB on `/explore/map/`). MapLibre is loaded on
@@ -324,7 +324,7 @@ shows `unused-*` under threshold; size-limit budgets unchanged.
   verify both the MapLibre control cluster and the filter chips remain
   reachable on iPhone 13 viewport.
 
-### PBI 3.1 — Color-contrast universal sweep · 🔴
+### PBI 3.1 — Color-contrast universal sweep · 🟢 (#1209)
 
 **Why.** `color-contrast` fails on **all 13 audited pages**. Likely
 culprit: `text-zinc-500` over `bg-zinc-50` or similar combos. WCAG AA
@@ -355,7 +355,7 @@ forbidden `text-zinc-400` / `text-zinc-500` patterns on body copy.
 
 ---
 
-### PBI 3.2 — link-name + label-content-name-mismatch · 🔴
+### PBI 3.2 — link-name + label-content-name-mismatch · 🟢 (#1208)
 
 **Why.** `/community/observers/` and `/explore/recent/` flag links
 without discernible names — likely avatar `<img>` wrapped in `<a>`
@@ -388,7 +388,7 @@ avatars-as-links exist.
 
 ---
 
-### PBI 3.3 — Touch targets + link-in-text-block on `/explore/map/` · 🔴
+### PBI 3.3 — Touch targets + link-in-text-block on `/explore/map/` · 🟢 (#1202)
 
 **Why.** `target-size` fails on mobile (buttons < 44×44 px).
 `link-in-text-block` means inline links rely on color alone to be
@@ -416,7 +416,7 @@ components, possibly a global Tailwind `@layer components` for a
 
 ---
 
-### PBI 3.4 — crawlable-anchors on `/observe/` (SEO 92 → 100) · 🔴
+### PBI 3.4 — crawlable-anchors on `/observe/` (SEO 92 → 100) · 🟢 (#1198)
 
 **Why.** Lighthouse SEO flags `crawlable-anchors` on EN + ES observe
 pages. Likely `<a href="#">` or `onclick=`-driven links. Tanks search
@@ -458,7 +458,7 @@ this code mostly intact).
 - *Sign-in microcopy timing claims ("~30 s") are operator-dependent* —
   pick a copy that holds even if Resend/Gmail SMTP retries.
 
-### PBI 4.1 — Anon empty states for `/profile/` + `/console/` · 🔴
+### PBI 4.1 — Anon empty states for `/profile/` + `/console/` · 🟢 (#1201)
 
 **Why.** `/profile/` for anon shows 80% empty viewport with just *"Sign
 in to view your profile"*. `/console/` shows *"Sign in required."* with
@@ -492,7 +492,7 @@ current "Sign in" two-liner.
 
 ---
 
-### PBI 4.2 — Sign-in microcopy + post-submit state · 🔴
+### PBI 4.2 — Sign-in microcopy + post-submit state · 🟢 (#1196)
 
 **Why.** Verified in the journey audit: pressing **Send code** submits
 but no expectation is set on email arrival time, spam folder, or what
@@ -520,7 +520,7 @@ to do next. Drop-off risk during the email wait.
 
 ---
 
-### PBI 4.3 — Chat badge dynamic vs hardcoded · 🔴
+### PBI 4.3 — Chat badge dynamic vs hardcoded · 🟢 (#1194)
 
 **Why.** Header badge says *"Llama 1B · on-device"* but cards offer
 Gemma 4 E2B (recommended) + Llama 3.2 1B. Stale string that bit-rots
@@ -562,7 +562,7 @@ each model selected.
 - *PBI 5.4 depends on 2.2 because* render-blocking cleanup that assumes
   pre-purge CSS will under-perform after Sprint 2.
 
-### PBI 5.1 — Drop the redundant help FAB on `/observe/` · 🔴
+### PBI 5.1 — Drop the redundant help FAB on `/observe/` · ⚪ — closed as not-a-defect
 
 **Why.** `/observe/` has both a `❓` help FAB bottom-left **and** the
 chat bubble bottom-right. The help FAB duplicates Docs navigation.
@@ -590,7 +590,7 @@ help-bubble component with route gating.
 
 ---
 
-### PBI 5.2 — Sign-in passkey button: match other auth options · 🔴
+### PBI 5.2 — Sign-in passkey button: match other auth options · 🟢 (#1205)
 
 **Why.** Currently the passkey button has a highlighted (emerald-tinted)
 background suggesting it's selected/default. Other OAuth buttons are
@@ -617,7 +617,7 @@ in fact magic-link is the default for first-time users.
 
 ---
 
-### PBI 5.3 — `/docs/roadmap/` DOM size virtualization · 🔴
+### PBI 5.3 — `/docs/roadmap/` DOM size virtualization · 🟢 (#1200)
 
 **Why.** Lighthouse `dom-size` flagged **2194 elements** (highest in
 the audit). Indicates ~60+ roadmap items rendered server-side. This
@@ -645,7 +645,7 @@ content reachable by scroll; deep-link smoke verified.
 
 ---
 
-### PBI 5.4 — Render-blocking resources baseline reduction · 🔴
+### PBI 5.4 — Render-blocking resources baseline reduction · 🟢 (#1207)
 
 **Why.** Universal Lighthouse flag — ~40 ms savings per page from
 render-blocking CSS/JS. Small individually but compounds across the
@@ -778,3 +778,6 @@ re-run any time after `npm run build` to capture a fresh visual diff.
 |------|--------|
 | 2026-05-25 | Initial roadmap from comprehensive audit (54 screenshots + 13 Lighthouse reports). |
 | 2026-05-25 | Polish pass: TL;DR, TOC, mermaid dependency graph, status legend, per-PBI evidence links, file-path verification (ConsoleLayout, CommunityView), Epic-level risks. |
+| 2026-05-26 | All 16 in-scope PBIs merged via PRs #1194–#1209. PBI 5.1 closed as not-a-defect (no help FAB exists on /observe/; audit author confused a transient toast for a fixed element). Audit re-run surfaced 9 residual contrast elements (brand emerald-600 buttons + zinc-400 stat cards + a stale `dark:text-zinc-600` pair the sweep mis-wrote). PBI 3.1.1 (#1210) fixed them — 13/13 pages now PASS `color-contrast`. |
+| 2026-05-27 | PBI 3.1.2 (#1211) defensive sweep: 36 dynamic `text-red-*` error states gained `dark:text-red-400` variants — same a11y class as the CommunityView fix in #1210, but Lighthouse can't see them in a static run. Ratchet test extended to enforce the rule forward. |
+| 2026-05-28 | Spec closed. 19 PRs merged end-to-end. Lighthouse on main: color-contrast 13/13 ✓, geolocation-on-start 13/13 ✓, link-name 13/13 ✓, target-size on flagged routes ✓, LCP on `/explore/recent/` 1481 ms → 635 ms (-57%), DOM size on `/docs/roadmap/` 2194 → 1435 (-35%). |
