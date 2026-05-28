@@ -161,7 +161,7 @@ function renderConfidenceRing(confidence: number): string {
   const circumference = 2 * Math.PI * r;
   const dash = (circumference * c).toFixed(2);
   const gap  = (circumference - circumference * c).toFixed(2);
-  const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
+  const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500 dark:text-red-400';
   const pct = Math.round(c * 100);
   return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">
