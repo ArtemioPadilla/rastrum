@@ -150,7 +150,7 @@ const tr = t(lang) as any;
 
     const btn = document.createElement('button');
     btn.dataset.id = t.id ?? '';
-    btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50';
+    btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 dark:text-red-400 border-red-200 hover:bg-red-50';
     btn.textContent = L.revoke;
     btn.addEventListener('click', async () => {
       if (!(await openConfirmDialog({
@@ -178,7 +178,7 @@ const tr = t(lang) as any;
 
     if (!res.ok) {
       const empty = document.createElement('p');
-      empty.className = 'text-sm text-red-500';
+      empty.className = 'text-sm text-red-500 dark:text-red-400';
       empty.textContent = `Error al cargar tokens (${res.status}). Verifica que hayas iniciado sesión.`;
       list.replaceChildren(empty);
       return;

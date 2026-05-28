@@ -598,7 +598,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       audioBtnLabel.textContent = rec ? i18nGet('attach-audio-stop') : i18nGet('attach-audio');
     }
     audioBtn?.classList.toggle('border-red-500', rec);
-    audioBtn?.classList.toggle('text-red-600', rec);
+    audioBtn?.classList.toggle('text-red-600', rec); audioBtn?.classList.toggle('dark:text-red-400', rec);
+    audioBtn?.classList.toggle('dark:text-red-400', rec);
     audioElapsedEl?.classList.toggle('hidden', !rec);
   }
 
@@ -1457,7 +1458,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   function setVoiceBtnRecording(rec: boolean): void {
     if (!voiceBtn) return;
     voiceBtn.classList.toggle('border-red-500', rec);
-    voiceBtn.classList.toggle('text-red-600', rec);
+    voiceBtn.classList.toggle('text-red-600', rec); voiceBtn.classList.toggle('dark:text-red-400', rec);
+    voiceBtn.classList.toggle('dark:text-red-400', rec);
     const label = rec ? VOICE_STOP_LABEL : VOICE_DEFAULT_LABEL;
     voiceBtn.setAttribute('aria-label', label);
     voiceBtn.setAttribute('title', label);

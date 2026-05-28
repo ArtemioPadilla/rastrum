@@ -116,7 +116,7 @@ const tr = t(lang) as any;
     content.append(name, prefix, meta);
     const btn = document.createElement('button');
     btn.dataset.id = t.id ?? '';
-    btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50';
+    btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 dark:text-red-400 border-red-200 hover:bg-red-50';
     btn.textContent = L.revoke;
     btn.addEventListener('click', async () => {
       if (!(await openConfirmDialog({
@@ -139,7 +139,7 @@ const tr = t(lang) as any;
     const res = await fetch(TOKENS_URL, { headers: { Authorization: await getAuthHeader() } });
     if (!res.ok) {
       const p = document.createElement('p');
-      p.className = 'text-sm text-red-500';
+      p.className = 'text-sm text-red-500 dark:text-red-400';
       p.textContent = `Error loading tokens (${res.status}). Make sure you are signed in.`;
       list.replaceChildren(p);
       return;

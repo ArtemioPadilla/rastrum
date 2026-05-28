@@ -118,7 +118,7 @@ const isEs = lang === 'es';
           notConfiguredEl?.classList.remove('hidden');
           return;
         }
-        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(error.message)}</p>`;
+        listEl.innerHTML = `<p class="text-sm text-red-600 dark:text-red-400">${escapeHtml(error.message)}</p>`;
         listEl.classList.remove('hidden');
         return;
       }

@@ -206,7 +206,7 @@ const i18nBag = {
           <input type="checkbox" data-toggle-public="${escHtml(s.id)}" ${s.beneficiary_public ? 'checked' : ''} />
           ${escHtml(showPubliclyLabel)}
         </label>
-        <button data-decline="${escHtml(s.id)}" class="text-sm text-red-600">${escHtml(i18nBag.decline)}</button>`;
+        <button data-decline="${escHtml(s.id)}" class="text-sm text-red-600 dark:text-red-400">${escHtml(i18nBag.decline)}</button>`;
       privList.appendChild(li);
     }
   }
@@ -266,7 +266,7 @@ const i18nBag = {
       const li = document.createElement('li');
       li.className = 'flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2';
       const withdrawBtn = req.status === 'pending'
-        ? `<button data-withdraw="${escHtml(req.id)}" class="text-xs text-red-600">${escHtml(i18nBag.request_withdraw)}</button>`
+        ? `<button data-withdraw="${escHtml(req.id)}" class="text-xs text-red-600 dark:text-red-400">${escHtml(i18nBag.request_withdraw)}</button>`
         : '';
       li.innerHTML = `
         <span>

@@ -339,7 +339,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
               {shareLabel}
             </button>
-            <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500" aria-label={isEs ? 'Cambiar' : 'Change'}>{isEs ? 'Cambiar' : 'Change'}</button>
+            <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500 dark:text-red-400" aria-label={isEs ? 'Cambiar' : 'Change'}>{isEs ? 'Cambiar' : 'Change'}</button>
           </div>
         </div>
         <p id="id-note" class="hidden mt-2 text-sm text-zinc-700 dark:text-zinc-300"></p>
@@ -1225,7 +1225,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
     const circumference = 2 * Math.PI * r;
     const dash = (circumference * c).toFixed(2);
     const gap  = (circumference - (circumference * c)).toFixed(2);
-    const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
+    const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500 dark:text-red-400';
     const pct = Math.round(c * 100);
     return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">

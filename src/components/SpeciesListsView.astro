@@ -230,7 +230,7 @@ const labels = {
           <div class="flex gap-2 mt-auto pt-1">
             <a href="${href}" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escAttr(labels.view)} →</a>
             <button type="button" class="sl-edit-btn text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:underline" data-id="${escAttr(l.id)}">${escAttr(labels.edit)}</button>
-            <button type="button" class="sl-delete-btn text-xs font-medium text-red-500 hover:underline ml-auto" data-id="${escAttr(l.id)}">${escAttr(labels.delete)}</button>
+            <button type="button" class="sl-delete-btn text-xs font-medium text-red-500 dark:text-red-400 hover:underline ml-auto" data-id="${escAttr(l.id)}">${escAttr(labels.delete)}</button>
           </div>
         </div>`;
     }).join('');

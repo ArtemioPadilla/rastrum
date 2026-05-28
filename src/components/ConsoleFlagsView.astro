@@ -114,7 +114,7 @@ const isEs = lang === 'es';
       loadingEl.classList.add('hidden');
 
       if (error) {
-        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(error.message)}</p>`;
+        listEl.innerHTML = `<p class="text-sm text-red-600 dark:text-red-400">${escapeHtml(error.message)}</p>`;
         listEl.classList.remove('hidden');
         return;
       }
@@ -159,7 +159,7 @@ const isEs = lang === 'es';
     } catch (err) {
       loadingEl.classList.add('hidden');
       if (listEl) {
-        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml((err as Error).message)}</p>`;
+        listEl.innerHTML = `<p class="text-sm text-red-600 dark:text-red-400">${escapeHtml((err as Error).message)}</p>`;
         listEl.classList.remove('hidden');
       }
     }

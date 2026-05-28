@@ -245,10 +245,10 @@ const labels = {
         // setNodeState writes the reason to node.error, not node.output.error
         // — reading the wrong field meant every failure rendered blank.
         const error = n.state === 'failed' && n.error
-          ? `<br><span class="text-red-500">${escapeHtml(n.error)}</span>`
+          ? `<br><span class="text-red-500 dark:text-red-400">${escapeHtml(n.error)}</span>`
           : '';
         return `<div class="flex items-start gap-1.5">
-          <span class="shrink-0 ${n.state === 'done' ? 'text-emerald-500' : n.state === 'failed' ? 'text-red-500' : 'text-zinc-400'}">${stateIcon}</span>
+          <span class="shrink-0 ${n.state === 'done' ? 'text-emerald-500' : n.state === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-zinc-400'}">${stateIcon}</span>
           <span class="text-zinc-600 dark:text-zinc-400">${n.kind}${provider}${error}</span>
         </div>`;
       }).join('');

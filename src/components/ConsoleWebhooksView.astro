@@ -501,7 +501,8 @@ const eventKeys: Array<keyof typeof wEvents> = [
     eEl.classList.remove('hidden');
     eEl.classList.toggle('text-emerald-700', ok);
     eEl.classList.toggle('dark:text-emerald-400', ok);
-    eEl.classList.toggle('text-red-600', !ok);
+    eEl.classList.toggle('text-red-600', !ok); eEl.classList.toggle('dark:text-red-400', !ok);
+    eEl.classList.toggle('dark:text-red-400', !ok);
     eEl.classList.toggle('dark:text-red-400', !ok);
     setTimeout(() => eEl.classList.add('hidden'), 4000);
   }

@@ -111,7 +111,7 @@ const labels = {
         return;
       }
     } catch (e) {
-      list.innerHTML = `<li class="text-xs text-red-600">${escapeHtml(e instanceof Error ? e.message : String(e))}</li>`;
+      list.innerHTML = `<li class="text-xs text-red-600 dark:text-red-400">${escapeHtml(e instanceof Error ? e.message : String(e))}</li>`;
       return;
     }
 

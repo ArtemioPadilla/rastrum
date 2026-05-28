@@ -89,7 +89,7 @@ const isEs = lang === 'es';
           const count = Number(row.current_count ?? 0);
           const limit = Number(row.max_count ?? 100);
           const pct = limit > 0 ? count / limit : 0;
-          const statusCls = pct >= 1 ? 'text-red-600' : pct >= 0.8 ? 'text-amber-600' : 'text-emerald-600';
+          const statusCls = pct >= 1 ? 'text-red-600 dark:text-red-400' : pct >= 0.8 ? 'text-amber-600' : 'text-emerald-600';
           const statusLabel = pct >= 1 ? 'exceeded' : pct >= 0.8 ? 'warning' : 'ok';
           const resetAt = row.reset_at ? new Date(row.reset_at as string).toLocaleTimeString() : '—';
           return `<tr>
@@ -107,7 +107,7 @@ const isEs = lang === 'es';
     } catch (err) {
       loadingEl?.classList.add('hidden');
       if (tbodyEl) {
-        tbodyEl.innerHTML = `<tr><td colspan="6" class="px-3 py-2 text-red-500">${escapeHtml((err as Error).message)}</td></tr>`;
+        tbodyEl.innerHTML = `<tr><td colspan="6" class="px-3 py-2 text-red-500 dark:text-red-400">${escapeHtml((err as Error).message)}</td></tr>`;
         listEl?.classList.remove('hidden');
       }
     }
