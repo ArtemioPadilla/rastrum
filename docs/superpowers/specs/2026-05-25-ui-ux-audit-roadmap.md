@@ -1,32 +1,46 @@
-# UI/UX audit roadmap — 2026-05-25
+# UI/UX audit roadmap — 2026-05-25 (closed 2026-05-28)
 
-> Where Rastrum needs to be "world class" and exactly how to get there.
-> Generated from a comprehensive Lighthouse + Playwright audit of `main`,
-> structured as Scrum epics so the work can be picked up incrementally
-> without losing the whole picture.
+> Where Rastrum needs to be "world class" and exactly how it got there.
+> Generated 2026-05-25 from a comprehensive Lighthouse + Playwright audit
+> of `main`, structured as Scrum epics, then shipped end-to-end as
+> **20 auto-merged PRs over 2026-05-25 → 2026-05-28**.
+>
+> **Dual-purpose doc.** Sections 1–8 preserve the original plan as
+> written on 2026-05-25 (archeological record). Sections 9–13 are the
+> retrospective: measured deltas, lessons learned, and a reproducible
+> playbook for the next audit cycle.
 
 ## TL;DR
 
-The product floor is already high (Lighthouse perf **95–100** on most
-pages). The audit surfaced **17 concrete, scoped defects** that prevent
-Rastrum from being unambiguously world-class:
+The product floor was already high (Lighthouse perf **95–100** on most
+pages). The audit surfaced **17 concrete, scoped defects** that prevented
+Rastrum from being unambiguously world-class. **16 are now resolved on
+main; 1 turned out not to be a defect** (PBI 5.1 — the audit author
+mistook a transient toast for a persistent help FAB).
 
-| Tier | Theme | Concrete worst | Sprint |
+| Tier | Theme | Concrete worst | Status |
 |------|-------|-----------------|:------:|
-| **P0** | Cookie banner covers primary CTA on mobile | every mobile screenshot | 1 |
-| **P0** | Onboarding tour tooltip overlaps top nav on `/observe/` | `10-observe-en.desktop.png` | 1 |
-| **P0** | Geolocation requested on page load (3 pages) | Lighthouse `geolocation-on-start` | 1 |
-| **P0** | `/explore/recent/` LCP **1481 ms** (3× the median page) | `lhr-*-explore-recent.json` | 1–2 |
-| **P1** | `color-contrast` fails on **13/13** audited pages | every Lighthouse report | 2 |
-| **P1** | Anon `/profile/` + `/console/` waste 80% of viewport | `42-profile.*.png`, `50-console.*.png` | 3 |
-| **P2** | DOM size **2194 elements** on `/docs/roadmap/` | `lhr-*-docs-roadmap.json` | 4 |
+| **P0** | Cookie banner covers primary CTA on mobile | every mobile screenshot | 🟢 #1195 |
+| **P0** | Onboarding tour tooltip overlaps top nav on `/observe/` | `10-observe-en.desktop.png` | 🟢 #1199 |
+| **P0** | Geolocation requested on page load (3 pages) | Lighthouse `geolocation-on-start` | 🟢 #1197 |
+| **P0** | `/explore/recent/` LCP **1481 ms** (3× the median page) | `lhr-*-explore-recent.json` | 🟢 #1206 |
+| **P1** | `color-contrast` fails on **13/13** audited pages | every Lighthouse report | 🟢 #1209 + #1210 + #1211 |
+| **P1** | Anon `/profile/` + `/console/` waste 80% of viewport | `42-profile.*.png`, `50-console.*.png` | 🟢 #1201 |
+| **P2** | DOM size **2194 elements** on `/docs/roadmap/` | `lhr-*-docs-roadmap.json` | 🟢 #1200 |
 
-**Scope:** 17 PBIs across 5 epics, ~**78 story points**, **~3–4 sprints**
-at typical solo-dev velocity. Each PBI is intended as **one PR**.
+**Measured outcome** (verified by audit re-run on 2026-05-26 and 2026-05-28):
 
-**"World class" exit criteria** (see [Metrics](#metrics--definition-of-world-class)):
-Lighthouse ≥ 95 on perf + a11y for every audited page, LCP < 800 ms on
-the worst page, **0** universal-failure audits.
+- LCP on `/explore/recent/`: **1481 ms → 635 ms (−57%)**
+- DOM size on `/docs/roadmap/`: **2194 → 1435 elements (−35%)**
+- `color-contrast`: **0/13 pages pass → 13/13 pass**
+- `geolocation-on-start`: **10/13 → 13/13 pass**
+- `link-name`: **11/13 → 13/13 pass**
+- Worst-page Lighthouse a11y score: **88 → ≥96**
+
+**Original scope:** 17 PBIs across 5 epics, ~**78 story points**, plan
+of **~3–4 sprints** at typical solo-dev velocity. **Actual:** shipped in
+**3 calendar days** by dispatching parallel worktrees + subagents +
+auto-merge cascade (see [Process](#process--how-this-shipped-in-3-days)).
 
 ---
 
@@ -40,10 +54,12 @@ the worst page, **0** universal-failure audits.
 6. [Epic 3 — A11y compliance (P1)](#epic-3--a11y-compliance-p1)
 7. [Epic 4 — Onboarding journey polish (P1)](#epic-4--onboarding-journey-polish-p1)
 8. [Epic 5 — Visual chrome cleanup (P2)](#epic-5--visual-chrome-cleanup-p2)
-9. [Metrics — definition of "world class"](#metrics--definition-of-world-class)
-10. [How this list was generated](#how-this-list-was-generated)
-11. [Out of scope (intentional)](#out-of-scope-intentional)
-12. [Change log](#change-log)
+9. [Metrics — measured before/after](#metrics--measured-beforeafter)
+10. [Process — how this shipped in 3 days](#process--how-this-shipped-in-3-days)
+11. [Retrospective — what worked, what bit us](#retrospective--what-worked-what-bit-us)
+12. [How to re-run this audit](#how-to-re-run-this-audit)
+13. [Out of scope (intentional)](#out-of-scope-intentional)
+14. [Change log](#change-log)
 
 ---
 
@@ -710,65 +726,247 @@ Sprint 4 ━━━━━━━━━━━━━━━━━━━━━━━�
 
 ---
 
-## Metrics — definition of "world class"
+## Metrics — measured before/after
 
-After all 4 sprints, the audit re-run should show:
+The "Target" column is what the roadmap promised on 2026-05-25. The
+"After" column is the measured value from the 2026-05-28 audit re-run
+on `main` post-#1212. Methodology: identical Lighthouse CI config
+(`lighthouserc.cjs`), identical `dist/` build, same 13 routes.
 
-| Metric | Today | Target |
-|---|---:|---:|
-| Lighthouse perf (worst page) | 95 | **≥ 95 all pages** |
-| Lighthouse a11y (worst) | 88 | **≥ 95 all pages** |
-| LCP (worst) | 1481 ms | **< 800 ms** |
-| CLS | ~0 | unchanged |
-| TBT | 0 ms | unchanged |
-| `geolocation-on-start` violations | 3 pages | **0** |
-| `color-contrast` violations | 13 pages | **0** |
-| `link-name` violations | 2 pages | **0** |
-| DOM size > 1500 elements | 2 pages | **0** |
-| Bundle budget gate trips | 0 | unchanged |
-| Cookie banner blocks CTA | yes | **no** |
+| Metric | Before (2026-05-25) | Target | After (2026-05-28) |
+|---|---:|---:|---:|
+| Lighthouse perf — worst page | 95 | ≥ 95 all pages | **100** ✓ |
+| Lighthouse a11y — worst page | 88 | ≥ 95 all pages | **96** ✓ |
+| `largest-contentful-paint` — worst (`/explore/recent/`) | 1481 ms | < 800 ms | **635 ms** ✓ |
+| `cumulative-layout-shift` | ~0 | unchanged | ~0 ✓ |
+| `total-blocking-time` | 0 ms | unchanged | 0 ms ✓ |
+| `geolocation-on-start` violations | 3 pages | 0 | **0** ✓ |
+| `color-contrast` violations | 13 pages | 0 | **0** ✓ |
+| `link-name` violations | 2 pages | 0 | **0** ✓ |
+| `target-size` violations on flagged routes | 2 pages | 0 | **0** ✓ |
+| `crawlable-anchors` on `/observe/` | 2 pages | 0 | **0** ✓ |
+| `dom-size` on `/docs/roadmap/` | 2194 | ≤ 1000 | **1435** † |
+| `size-limit` bundle budget trips | 0 | unchanged | 0 ✓ |
+| Cookie banner blocks CTA above-the-fold | yes | no | **no** ✓ |
+| Tour tooltip overlaps top-nav | yes | no | **no** ✓ |
 
-How to re-verify the targets:
-
-```bash
-npm run build                       # 255 pages, must build clean
-node scripts/audit-screenshots.mjs  # re-capture 54 PNGs
-npm run test:lhci                   # 13 Lighthouse reports
-```
-
-Then diff `audit-screenshots/` against the snapshot taken on
-2026-05-25 and inspect every `.lighthouseci/lhr-*.json` audit whose
-`score < 1`.
+† DOM size on `/docs/roadmap/` came in at 1435, above the 1000-element
+target. The roadmap's article body dropped 1265 → 485 elements (−62%),
+exactly on the PBI 5.3 design. The remaining 950 elements are the
+chrome (Header + sidebar + footer + drawers + dialogs in `BaseLayout` /
+`DocLayout`) which contributes ~1000 elements on every doc page.
+Pushing below 1000 requires a separate chrome-reduction PBI — see
+[Out of scope](#out-of-scope-intentional).
 
 ---
 
-## How this list was generated
+## Process — how this shipped in 3 days
 
-1. `npm run build` — 255 pages built clean.
-2. `npm run test:lhci` against `dist/` — 13 routes audited × 1 run
-   each.
-3. `node scripts/audit-screenshots.mjs` against `astro preview` —
-   27 routes × desktop (1366×800) + mobile (iPhone 13) = **54 PNG**.
-4. Manual review of every Lighthouse JSON for `audits[*].score < 1` +
-   manual review of every screenshot.
-5. Issues clustered by theme → epics; each issue scoped → PBI; PBIs
-   sized in Fibonacci points (1/2/3/5/8/13).
+The plan was 3–4 sprints (~6–8 calendar weeks at solo velocity). It
+shipped in 3 calendar days. The pattern is reusable for any
+similarly-shaped audit follow-up.
 
-The screenshot harness lives at `scripts/audit-screenshots.mjs` —
-re-run any time after `npm run build` to capture a fresh visual diff.
+### The orchestration loop
+
+For each PBI, repeat:
+
+```
+1. git worktree add .worktrees/pbi-X.Y -b feat/pbi-X.Y origin/main
+2. Dispatch a subagent (general-purpose) with:
+   - The exact worktree path
+   - The PBI's full body (AC, files, DoD) from this doc
+   - "Do NOT run git commands" + verification checklist
+3. While agents work in parallel, the controller commits + pushes
+   + opens PR + arms gh pr merge --auto --squash on each completion.
+4. A Monitor task polls for PR state changes; the controller is
+   notified per-merge to fan out the next batch.
+```
+
+For Sprint 1's first batch this looked like **4 PBIs running in
+parallel** (1.1, 1.2, 1.3, 2.1) → 4 simultaneous PRs → CI passes →
+auto-merge cascade. By the time the controller fanned out the next
+batch, 3 of 4 were already on `main`.
+
+### Why this works (and where to be careful)
+
+- **Worktrees give isolation without context-switching cost.** Each
+  branch lives in its own directory with its own `node_modules`
+  symlink. The controller's main checkout stays clean for orchestration
+  commands.
+- **Auto-merge is a force multiplier.** Once CI is trusted (full
+  `test`, `audit`, `validate`, `verify`, `CodeQL`, `GitGuardian` all
+  green), arming `gh pr merge --auto --squash` removes the controller
+  from the critical path. PRs land while you're dispatching the next
+  batch.
+- **Caveat: file-overlap requires sequencing.** PBIs 2.1 + 3.2 both
+  touch `ExploreRecentView.astro`. Run 2.1 first, let it land, then
+  start 3.2 — otherwise you eat a merge conflict (which actually
+  happened on PBI 3.1's massive 215-file sweep when 3.2 + 5.4 merged
+  during its CI window).
+- **Caveat: subagents can't git, controller must.** The
+  `feedback_subagent_worktree_git_env` memory documents this. Tell
+  the agent the worktree path and "do NOT run git commands"; the
+  controller commits, pushes, opens PR, arms auto-merge.
+
+### Goal-set hooks as phase gates
+
+Every meaningful phase shift was kicked off by `/goal`:
+
+| Goal | Phase |
+|---|---|
+| "finish docs/superpowers/specs/2026-05-25-…" | Spec polish (#1193) |
+| "implement the roadmap" | All 17 PBIs |
+| "fix all items detected" | 3.1.1 + 3.1.2 + ratchet extension |
+| "review the roadmap and enhance it" | This retrospective edit |
+
+The Stop-hook condition blocks the loop from ending until the named
+state holds. It's a clean way to declare "this isn't done until X is
+true" without baking the criterion into prompts.
+
+---
+
+## Retrospective — what worked, what bit us
+
+### What worked beyond expectations
+
+1. **The screenshot harness made before/after comparison crisp.**
+   `scripts/audit-screenshots.mjs` produces 54 PNGs (27 routes ×
+   desktop+mobile) in ~80 seconds. Moving the baseline to
+   `audit-screenshots-baseline/` then re-running gave a visual diff
+   that doesn't lie. This caught the contrast issues PBI 3.1.1 fixed
+   *before* anything reached prod.
+2. **Parallel subagent dispatch shipped 9 PBIs in 2 batches.** Sprint 1
+   (4 PBIs) + the second wave (3 PBIs) + a third wave (3 PBIs) ran
+   inside ~2 hours of wall-clock orchestration. Each subagent did
+   its own TDD red-green cycle.
+3. **Ratchet tests lock in the gains forever.**
+   `tests/unit/color-contrast-policy.test.ts` enforces the policy
+   forward — any future PR introducing `text-zinc-500`,
+   `dark:text-zinc-500`, or bare `text-red-{500|600|700}` fails CI.
+   This is *durable* policy enforcement, not tribal knowledge.
+
+### What surprised us (worth memorizing for next time)
+
+1. **`classList.toggle('foo bar', cond)` silently no-ops.**
+   PBI 3.1's mechanical sweep turned single-token
+   `classList.toggle('text-zinc-500', !active)` into
+   `classList.toggle('text-zinc-600 dark:text-zinc-300', !active)` —
+   which `DOMTokenList.toggle()` rejects (single-token contract).
+   Caught by `tests/e2e/obs-detail-edit.spec.ts` when the Location
+   tab stopped flipping `aria-selected`. **Memory saved:**
+   `reference_tailwind_sweep_classlist_trap.md`. Generalization: any
+   mechanical Tailwind-class sweep needs a `grep` on the diff for
+   `classList\.(toggle|add|remove)` callers, because those are
+   DOMTokenList tokens, not CSS class attributes.
+2. **The Lighthouse audit's premise was incomplete.** PBI 3.1's AC
+   said "swap `text-zinc-500` → `text-zinc-600`". That fixed body
+   text but Lighthouse still failed because (a) brand emerald-600
+   buttons with white text are only 3.76:1, (b) PBI 3.1 wrote
+   `dark:text-zinc-600` paired with `text-zinc-600` (broken dark
+   variant — 2.57:1 on `bg-zinc-900`), (c) dynamic `text-red-*` in
+   `innerHTML` templates and `classList` calls weren't in scope.
+   PBI 3.1.1 + 3.1.2 closed the gaps. **Lesson:** never trust an
+   AC that targets a single token without an audit re-run.
+3. **E2E tests catch what unit + tsc + build don't.** PBI 4.1's
+   anon-empty-states refactor flipped `#console-gate` to use a new
+   `#console-anon` div. The unit tests, tsc, and build all passed
+   locally; the CI `console-smoke.spec.ts` caught the broken gate.
+   **Memory aligned:** `reference_observeview2_script_e2e_gate.md`
+   — Playwright is the only real gate for client-side script
+   behavior.
+4. **PBI 5.1 was a false positive.** No help FAB exists on
+   `/observe/`. The audit author saw a transient toast in a
+   screenshot and recorded it as a permanent UI element. Recon
+   before dispatching saved a no-op PR. **Lesson:** verify each
+   PBI's premise against current `main` before queuing work.
+
+### What we'd do differently
+
+- **Run the audit re-run *during* the sweep, not after.** If we'd
+  re-run Lighthouse after PBI 3.1's first commit, we'd have caught
+  the brand-emerald + broken-dark-variant issues before opening
+  PBI 3.1.1. The 215-file sweep was correct for its declared scope
+  but the declared scope was too narrow.
+- **Pre-write the ratchet rule for every sweep PBI.** PBI 3.1
+  shipped with a 2-assertion ratchet. PBI 3.1.2 extended it to 3
+  assertions. We should have written all 3 up front; the extra
+  assertion would have caught the dynamic `text-red-*` gap during
+  the original sweep.
+- **Add a `grep` step to the subagent template for sweeps.** For
+  any mechanical class sweep, the subagent should always grep the
+  diff for `classList.(toggle|add|remove)` and report multi-token
+  hits. This is the kind of safety net that lives in the agent
+  prompt, not the codebase.
+
+---
+
+## How to re-run this audit
+
+Anyone wanting to validate the gains or run a fresh audit can do
+this from `main`:
+
+```bash
+# 1. Stash the previous run as baseline (if present)
+mv .lighthouseci .lighthouseci-baseline 2>/dev/null || true
+mv audit-screenshots audit-screenshots-baseline 2>/dev/null || true
+
+# 2. Fresh build
+npm run build              # 255 pages, must complete clean
+
+# 3. Capture screenshots (needs a preview server on :4329)
+npx astro preview --port 4329 &
+PID=$!
+until curl -fs http://localhost:4329/en/ >/dev/null; do sleep 0.5; done
+node scripts/audit-screenshots.mjs    # 54 PNGs, ~80s
+kill $PID
+
+# 4. Run Lighthouse CI (spawns its own server)
+npm run test:lhci          # 13 reports, ~3 min
+
+# 5. Diff visually
+ls audit-screenshots*/00-locale-picker.desktop.png  # eyeball compare
+
+# 6. Compare metrics programmatically
+python3 -c "
+import json, glob
+for p in sorted(glob.glob('.lighthouseci/lhr-*.json')):
+    with open(p) as f: lhr = json.load(f)
+    url = lhr.get('finalDisplayedUrl', '')
+    cc = lhr['audits']['color-contrast']['score']
+    geo = lhr['audits']['geolocation-on-start']['score']
+    lcp = lhr['audits']['largest-contentful-paint']['numericValue']
+    print(f'{url[-40:]:<40}  cc={cc}  geo={geo}  lcp={int(lcp)}ms')
+"
+```
+
+The `lighthouserc.cjs` asserts:
+- `categories.performance` ≥ 0.85, `accessibility` ≥ 0.85, `best-practices` ≥ 0.90, `seo` ≥ 0.95
+- `largest-contentful-paint` ≤ 2500 ms, `cumulative-layout-shift` ≤ 0.1,
+  `total-blocking-time` ≤ 200 ms
+
+Failures show up as `warning` or `error` lines in the LHCI output.
+Drilling into a specific failure: open the report URL printed by
+`lhci autorun` (Google CDN-hosted) or the local `.lighthouseci/lhr-*.html`.
 
 ---
 
 ## Out of scope (intentional)
 
+Items the audit *could* have flagged but were intentionally left for a
+future cycle, with the rationale for deferral:
+
 | Item | Why out of scope | Tracked as |
 |------|------------------|-----------:|
 | Real-device testing (iOS Safari, Android Chrome) | Playwright is Chromium-only. A one-time real-device pass is worthwhile but not blocking this roadmap. | (none — future) |
-| Brand redesign (palette, typography, illustration) | Already working. This roadmap is about *fixing what's broken*, not redesigning. | (none — explicit non-goal) |
-| PWA install-flow rework | Already addressed: defer until first observation synced. | [#1186] |
-| Real BirdNET audio in onboarding step 4 | Audio model integration is its own scope. | [#1192] |
-| WhatsApp OTP | Blocked on external Twilio/WhatsApp Business approval. | [#1190] |
-| i18n expansion beyond EN/ES/zap | Zapoteco overlay shipped as a proof-of-concept; broader rollout needs its own roadmap. | [#1188] |
+| Brand redesign (palette, typography, illustration) | Already working. This roadmap was about *fixing what's broken*, not redesigning. | (explicit non-goal) |
+| PWA install-flow rework | Already addressed: defer until first observation synced. | #1186 |
+| Real BirdNET audio in onboarding step 4 | Audio model integration is its own scope. | #1192 |
+| WhatsApp OTP | Blocked on external Twilio/WhatsApp Business approval. | #1190 |
+| i18n expansion beyond EN/ES/zap | Zapoteco overlay shipped as a proof-of-concept; broader rollout needs its own roadmap. | #1188 |
+| Chrome DOM-size reduction (`<body>` floor ≈ 1000 elements) | The roadmap's `dom-size` PBI (5.3) targeted `/docs/roadmap/` which dropped 2194 → 1435. Doc pages still exceed 1000 because of header + sidebar + drawers + dialogs in `BaseLayout`/`DocLayout`. Touching those is a structural change with risk surface larger than the SEO benefit. | (future — chrome-reduction PBI) |
+| `render-blocking-resources` on bundled CSS | Astro emits `/_astro/*.css` as `<link rel="stylesheet">` — that's the critical Tailwind output. Deferring it would cause a FOUC. Lighthouse treats this as expected. PBI 5.4 deferred the external MapLibre CSS; the bundle stays critical. | (explicit non-goal) |
+| Server-side error states' contrast | Lighthouse audits only the SSR'd HTML. PBI 3.1.2 (#1211) defensively swept all 36 dynamic `text-red-*` sites in `innerHTML`/`classList` calls so they meet AA when they paint — but those don't appear in static Lighthouse runs. | #1211 (done preemptively) |
+| Brand emerald-600 → emerald-700 on non-button surfaces | PBI 3.1.1 (#1210) bumped the cookie banner + filter button + TimeSlider where they failed contrast with white text. Other brand surfaces using emerald-600 (chips, accents) don't pair with white text and weren't flagged. | (audit-driven, not a sweep) |
 
 ---
 
@@ -781,3 +979,4 @@ re-run any time after `npm run build` to capture a fresh visual diff.
 | 2026-05-26 | All 16 in-scope PBIs merged via PRs #1194–#1209. PBI 5.1 closed as not-a-defect (no help FAB exists on /observe/; audit author confused a transient toast for a fixed element). Audit re-run surfaced 9 residual contrast elements (brand emerald-600 buttons + zinc-400 stat cards + a stale `dark:text-zinc-600` pair the sweep mis-wrote). PBI 3.1.1 (#1210) fixed them — 13/13 pages now PASS `color-contrast`. |
 | 2026-05-27 | PBI 3.1.2 (#1211) defensive sweep: 36 dynamic `text-red-*` error states gained `dark:text-red-400` variants — same a11y class as the CommunityView fix in #1210, but Lighthouse can't see them in a static run. Ratchet test extended to enforce the rule forward. |
 | 2026-05-28 | Spec closed. 19 PRs merged end-to-end. Lighthouse on main: color-contrast 13/13 ✓, geolocation-on-start 13/13 ✓, link-name 13/13 ✓, target-size on flagged routes ✓, LCP on `/explore/recent/` 1481 ms → 635 ms (-57%), DOM size on `/docs/roadmap/` 2194 → 1435 (-35%). |
+| 2026-05-28 | Doc enhanced as living retrospective: replaced forward-looking "Today/Target" metrics table with measured before/after column; added Process (orchestration loop + what made the 3-day shipping cadence possible), Retrospective (what worked, what surprised us, what we'd do differently), and How-to-re-run sections; expanded Out-of-scope with discovered-during-execution items. |
