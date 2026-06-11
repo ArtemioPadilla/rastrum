@@ -5,9 +5,9 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.E2E_PORT ?? 4329);
 const LOCAL_BASE_URL = `http://127.0.0.1:${PORT}`;
 
-// When PLAYWRIGHT_BASE_URL or BASE_URL is set we hit a real deployment instead
-// of spinning up `astro preview` locally. The smoke-nightly workflow uses
-// BASE_URL (GitHub standard) while the older nightly-smoke uses PLAYWRIGHT_BASE_URL.
+// When PLAYWRIGHT_BASE_URL (or BASE_URL) is set we hit a real deployment
+// instead of spinning up `astro preview` locally. The nightly-smoke workflow
+// sets PLAYWRIGHT_BASE_URL=https://rastrum.org to run against production.
 const REMOTE_BASE_URL = (process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL)?.replace(/\/$/, '');
 const BASE_URL = REMOTE_BASE_URL || LOCAL_BASE_URL;
 
