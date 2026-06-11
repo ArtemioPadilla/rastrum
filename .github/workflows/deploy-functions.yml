@@ -58,6 +58,9 @@ on:
       - 'supabase/functions/**'
       - '.github/workflows/deploy-functions.yml'
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -67,8 +70,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # Need at least 2 commits so we can diff against the parent on push.
-          fetch-depth: 2
+          # Full history so `git diff <before> <sha>` always resolves. A
+          # shallow clone (fetch-depth: 2) made github.event.before
+          # unreachable on multi-commit pushes; the diff failed, `|| true`
+          # masked it, and the run went green having deployed nothing —
+          # the same masked-diff class that hid PR #42's schema in
+          # db-apply.yml. Mirrors db-apply.yml's hardening.
+          fetch-depth: 0
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -108,21 +116,36 @@ jobs:
             # backfills work after a workflow refactor.
             BASE="${{ github.event.before }}"
             HEAD="${{ github.sha }}"
-            CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
-            WORKFLOW_TOUCHED=$(echo "$CHANGED" | grep -E '^\.github/workflows/deploy-functions\.yml$' || true)
-            SHARED_TOUCHED=$(echo "$CHANGED" | grep -E '^supabase/functions/_' || true)
-            if [ -n "$WORKFLOW_TOUCHED" ] || [ -n "$SHARED_TOUCHED" ]; then
-              echo "→ workflow or _shared changed; deploying all functions"
+            if [ "$BASE" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE" ]; then
+              # Force-push or first push to branch: no usable diff base.
+              # Deploy everything defensively (deploys are idempotent).
+              echo "→ no diff base (first/force push); deploying all functions"
               FNS="$ALL_FNS"
+            elif ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+              # An unresolvable diff base previously fell through
+              # `2>/dev/null || true` into an empty CHANGED set, so the run
+              # went green with "no function-code changes detected" while
+              # deploying nothing (the PR #42 masked-diff class). Fail loud
+              # instead; the operator can backfill unconditionally.
+              echo "::error::Cannot resolve before-SHA ${BASE} (shallow clone? rewritten history?). Refusing to silently skip — re-run via: gh workflow run deploy-functions.yml -f function=all"
+              exit 1
             else
-              # Same _-prefix filter as ALL_FNS — _shared/ changes don't
-              # produce a deployable function on their own.
-              FNS=$(echo "$CHANGED" \
-                | grep -E '^supabase/functions/' \
-                | awk -F/ 'NF>=3 && $3!="" {print $3}' \
-                | grep -v '^_' \
-                | sort -u \
-                | tr '\n' ' ')
+              CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+              WORKFLOW_TOUCHED=$(echo "$CHANGED" | grep -E '^\.github/workflows/deploy-functions\.yml$' || true)
+              SHARED_TOUCHED=$(echo "$CHANGED" | grep -E '^supabase/functions/_' || true)
+              if [ -n "$WORKFLOW_TOUCHED" ] || [ -n "$SHARED_TOUCHED" ]; then
+                echo "→ workflow or _shared changed; deploying all functions"
+                FNS="$ALL_FNS"
+              else
+                # Same _-prefix filter as ALL_FNS — _shared/ changes don't
+                # produce a deployable function on their own.
+                FNS=$(echo "$CHANGED" \
+                  | grep -E '^supabase/functions/' \
+                  | awk -F/ 'NF>=3 && $3!="" {print $3}' \
+                  | grep -v '^_' \
+                  | sort -u \
+                  | tr '\n' ' ')
+              fi
             fi
             FNS=$(echo "$FNS" | xargs)
             if [ -z "$FNS" ]; then

@@ -9,6 +9,7 @@ const ROUTES: Record<'en' | 'es', string[]> = {
     '/en/observe/',
     '/en/explore/',
     '/en/explore/map/',
+    '/en/explore/recent/',
     '/en/about/',
     '/en/docs/',
     '/en/sign-in/',
@@ -20,6 +21,7 @@ const ROUTES: Record<'en' | 'es', string[]> = {
     '/es/observar/',
     '/es/explorar/',
     '/es/explorar/mapa/',
+    '/es/explorar/recientes/',
     '/es/acerca/',
     '/es/docs/',
     '/es/ingresar/',
@@ -88,6 +90,16 @@ for (const lang of ['en', 'es'] as const) {
     }
   });
 }
+
+// Ported from the retired tests/smoke/home.spec.ts (consolidated into the
+// nightly-smoke workflow): the home page title must brand-check, not just
+// be non-empty — catches a wrong site being served at the apex.
+test('home title contains Rastrum', async ({ page }) => {
+  await page.goto('/en/');
+  await expect(page).toHaveTitle(/Rastrum/i);
+  await page.goto('/es/');
+  await expect(page).toHaveTitle(/Rastrum/i);
+});
 
 test('lang attribute matches locale segment', async ({ page }) => {
   await page.goto('/en/');
