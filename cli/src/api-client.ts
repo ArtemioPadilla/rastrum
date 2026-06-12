@@ -26,6 +26,8 @@ export interface ObserveResponse {
   id: string;
   observed_at: string;
   created_at: string;
+  /** Present when a secondary write (identification / photo attach) failed. */
+  warnings?: string[];
 }
 
 export class ApiClient {

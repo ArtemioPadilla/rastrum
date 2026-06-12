@@ -124,28 +124,41 @@ export async function handler(req: Request): Promise<Response> {
 
     if (obsErr) return json({ error: obsErr.message }, 500);
 
+    // The observation row is already committed at this point, so failures
+    // attaching the identification / photo are surfaced as warnings on the
+    // 201 (failing the whole request would strand a half-created record).
+    const warnings: string[] = [];
+
     // Attach identification if scientific_name provided
     if (body.scientific_name && obs?.id) {
-      await supabase.from('identifications').insert({
+      const { error: idErr } = await supabase.from('identifications').insert({
         observation_id: obs.id,
         identifier_id: auth.user_id,
         scientific_name: body.scientific_name,
-        id_source: 'human',
+        source: 'human',
         confidence: 1.0,
       });
+      if (idErr) {
+        console.warn('[api] identification insert failed', idErr.message);
+        warnings.push(`identification not saved: ${idErr.message}`);
+      }
     }
 
     // Attach photo if provided
     if (photo_url && obs?.id) {
-      await supabase.from('media_files').insert({
+      const { error: mediaErr } = await supabase.from('media_files').insert({
         observation_id: obs.id,
         url: photo_url,
         media_type: 'photo',
         is_primary: true,
       });
+      if (mediaErr) {
+        console.warn('[api] media insert failed', mediaErr.message);
+        warnings.push(`photo not attached: ${mediaErr.message}`);
+      }
     }
 
-    return json(obs, 201);
+    return json(warnings.length > 0 ? { ...obs, warnings } : obs, 201);
   }
 
   // ── POST /api/identify ───────────────────────────────────────────────────
@@ -236,7 +249,7 @@ export async function handler(req: Request): Promise<Response> {
       .select(`
         id, observed_at, notes, habitat, evidence_type, created_at,
         media_files(url, is_primary),
-        identifications(scientific_name, confidence, id_source)
+        identifications(scientific_name, confidence, source)
       `)
       .eq('observer_id', auth.user_id)
       .order('observed_at', { ascending: false })
@@ -260,7 +273,7 @@ export async function handler(req: Request): Promise<Response> {
       .from('observations')
       .select(`
         id, observed_at, notes, habitat, location,
-        identifications(scientific_name, confidence, id_source)
+        identifications(scientific_name, confidence, source)
       `)
       .eq('observer_id', auth.user_id)
       .order('observed_at', { ascending: false });
@@ -293,7 +306,7 @@ export async function handler(req: Request): Promise<Response> {
           row.habitat ?? '',
           `"${(row.notes ?? '').replace(/"/g, '""')}"`,
           'HumanObservation',
-          primary?.id_source ?? '',
+          primary?.source ?? '',
         ].join(',');
       });
 

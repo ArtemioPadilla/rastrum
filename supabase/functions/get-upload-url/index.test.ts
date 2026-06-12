@@ -19,6 +19,7 @@ function withEnv(): void {
   Deno.env.set('R2_PUBLIC_URL', 'https://media.example.org');
   Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
   Deno.env.set('SUPABASE_ANON_KEY', 'test-anon-key');
+  Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
 }
 
 Deno.test('get-upload-url: rejects GET with 405', async () => {

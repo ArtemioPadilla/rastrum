@@ -5,9 +5,20 @@
  *
  * Invoked by the sync engine after an observation upserts; idempotent (UPSERTs
  * the same observation row).
+ *
+ * Auth (in-code — the edge-layer verify_jwt flag is not sufficient, and the
+ * deploy flag may disable it): two accepted caller shapes.
+ *   1. User JWT (Authorization: Bearer <access_token>) — the sync engine's
+ *      supabase.functions.invoke path. The JWT is verified via auth.getUser
+ *      and the observation must belong to that user; otherwise any
+ *      authenticated caller could overwrite weather/moon columns on
+ *      arbitrary rows and use the function as an OpenMeteo amplifier.
+ *   2. X-Cron-Secret header — for server-side callers (other EFs / cron),
+ *      validated against CRON_SECRET like every cron-only function.
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { requireCronSecret } from '../_shared/cron-auth.ts';
 
 type Req = { observation_id: string };
 
@@ -64,16 +75,35 @@ export async function handler(req: Request): Promise<Response> {
 
   const url = Deno.env.get('SUPABASE_URL');
   const role = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!url || !role) return corsResponse('Function not configured', { status: 500 });
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!url || !role || !anonKey) return corsResponse('Function not configured', { status: 500 });
+
+  let callerId: string | null = null;
+  if (req.headers.get('x-cron-secret') !== null) {
+    const denied = requireCronSecret(req);
+    if (denied) return corsResponse(await denied.text(), { status: denied.status });
+  } else {
+    const jwt = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    if (!jwt) return corsResponse('Missing Authorization header', { status: 401 });
+    const authClient = createClient(url, anonKey, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    });
+    const { data: { user }, error: authErr } = await authClient.auth.getUser();
+    if (authErr || !user) return corsResponse('Invalid token', { status: 401 });
+    callerId = user.id;
+  }
 
   const db = createClient(url, role);
 
   const { data: obs } = await db
     .from('observations')
-    .select('id, observed_at, location')
+    .select('id, observed_at, location, observer_id')
     .eq('id', body.observation_id)
     .maybeSingle();
   if (!obs) return corsResponse('Observation not found', { status: 404 });
+  if (callerId && obs.observer_id !== callerId) {
+    return corsResponse('Forbidden — not your observation', { status: 403 });
+  }
 
   const geom = obs.location as { coordinates?: [number, number] } | null;
   const coords = geom?.coordinates;

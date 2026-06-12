@@ -4,13 +4,26 @@
  *
  * Why an Edge Function and not direct browser-side signing:
  *   - R2 access keys are server-side only (we never ship them in the bundle)
- *   - We can enforce per-user key-prefix scoping (a user can only upload to
- *     observations/<their-uuid>/* and avatars/<their-uuid>/*)
+ *   - We can enforce per-user key scoping (a user can only upload to
+ *     avatars/<their-uuid>/* and observation prefixes they own)
  *   - Future: virus / NSFW scan hook before issuing the URL
  *
  * Auth: requires a Supabase JWT (Authorization: Bearer ...). The function
- * validates the JWT and refuses to sign a path that doesn't match the
- * caller's user id.
+ * validates the JWT and refuses to sign a path the caller doesn't own.
+ *
+ * Key shapes under observations/ (the segment after observations/ is NOT
+ * always the user id — don't "simplify" this back to a userId prefix):
+ *   - observations/<observation-id>/<blob-id>.<ext>  — PWA sync.ts +
+ *     manage-panel.ts. Ownership is verified against observations.observer_id
+ *     with the service role (RLS would hide other users' private rows and
+ *     turn "not visible" into "allowed"). The PWA uploads media BEFORE
+ *     upserting the observation row (sync.ts step 1 vs step 2), so an id
+ *     with no row yet is allowed — client-generated v4 UUIDs are
+ *     unguessable — unless it collides with another user's id (the
+ *     /api/upload-url prefix shape below).
+ *   - observations/<user-id>/<blob-id>.<ext>         — the api EF's
+ *     /api/upload-url twin generates this shape server-side; here it is
+ *     allowed only when the segment equals the caller's own id.
  *
  * Env (set via `supabase secrets set`):
  *   CF_ACCOUNT_ID         Cloudflare account id (32-char hex)
@@ -19,6 +32,7 @@
  *   R2_BUCKET_NAME        e.g. 'rastrum-media'
  *   R2_PUBLIC_URL         e.g. 'https://media.rastrum.app'
  *   SUPABASE_URL / SUPABASE_ANON_KEY for JWT validation
+ *   SUPABASE_SERVICE_ROLE_KEY for the observation-ownership lookup
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
@@ -30,19 +44,18 @@ type Body = {
   contentType: string;  // e.g. 'image/jpeg'
 };
 
-const ALLOWED_PREFIXES = (userId: string) => [
-  `observations/`,                           // refined check below uses obs ownership
+const STATIC_PREFIXES = (userId: string) => [
   `avatars/${userId}/`,
   `og/`,                                     // pre-rendered OG cards (1200×630 PNG)
                                              //   og/<obs-id>.png (observation cards)
                                              //   og/u/<username>.png (profile cards)
 ];
 
-function safeKey(userId: string, key: string): string | null {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function keyShapeOk(key: string): boolean {
   // Block traversal
-  if (key.includes('..') || key.startsWith('/') || key.includes('//')) return null;
-  if (!ALLOWED_PREFIXES(userId).some(p => key.startsWith(p))) return null;
-  return key;
+  return !key.includes('..') && !key.startsWith('/') && !key.includes('//');
 }
 
 // CORS headers — applied to every response (including errors and the
@@ -85,7 +98,7 @@ export async function handler(req: Request): Promise<Response> {
   const r2Endpoint = env('R2_ENDPOINT_URL')
     ?? (env('CF_ACCOUNT_ID') ? `https://${env('CF_ACCOUNT_ID')}.r2.cloudflarestorage.com` : null);
   if (!r2Endpoint) return textResponse('Function not configured: R2_ENDPOINT_URL or CF_ACCOUNT_ID', 500);
-  const required = ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+  const required = ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
   for (const k of required) {
     if (!env(k)) return textResponse(`Function not configured: ${k}`, 500);
   }
@@ -127,8 +140,40 @@ export async function handler(req: Request): Promise<Response> {
   }
   if (!body?.key || !body?.contentType) return textResponse('Missing key or contentType', 400);
 
-  const safe = safeKey(user.id, body.key);
-  if (!safe) return textResponse('Forbidden key prefix', 403);
+  if (!keyShapeOk(body.key)) return textResponse('Forbidden key prefix', 403);
+
+  if (body.key.startsWith('observations/')) {
+    const [, segment, ...rest] = body.key.split('/');
+    if (!segment || !UUID_RE.test(segment) || rest.length === 0 || rest[rest.length - 1] === '') {
+      return textResponse('Forbidden key prefix', 403);
+    }
+    if (segment !== user.id) {
+      const svc = createClient(env('SUPABASE_URL')!, env('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: obsRow, error: obsErr } = await svc
+        .from('observations')
+        .select('observer_id')
+        .eq('id', segment)
+        .maybeSingle();
+      if (obsErr) return textResponse('Ownership check failed', 500);
+      if (obsRow) {
+        if (obsRow.observer_id !== user.id) return textResponse('Forbidden key prefix', 403);
+      } else {
+        // Not-yet-synced observation id (see header comment) — allowed,
+        // unless it is actually another user's id-prefix.
+        const { data: userRow, error: userRowErr } = await svc
+          .from('users')
+          .select('id')
+          .eq('id', segment)
+          .maybeSingle();
+        if (userRowErr) return textResponse('Ownership check failed', 500);
+        if (userRow) return textResponse('Forbidden key prefix', 403);
+      }
+    }
+  } else if (!STATIC_PREFIXES(user.id).some(p => body.key.startsWith(p))) {
+    return textResponse('Forbidden key prefix', 403);
+  }
+
+  const safe = body.key;
 
   // Construct the R2 client. R2 emulates S3; region is always 'auto'.
   const r2 = new S3Client({
