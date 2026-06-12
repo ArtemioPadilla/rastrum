@@ -120,6 +120,9 @@ async function processOne(
       station_key: opts.stationKey,
     });
     obsId = obs.id;
+    for (const w of obs.warnings ?? []) {
+      logLine(`WARN   ${entry.path}  (${w})`);
+    }
   } catch (err) {
     recordEntry(log, entry.path, { status: 'failed', error: `observe: ${(err as Error).message}`, photo_url: presigned.public_url });
     logLine(`FAIL   ${entry.path}  (observe: ${(err as Error).message})`);

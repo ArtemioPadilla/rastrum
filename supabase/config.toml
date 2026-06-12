@@ -21,7 +21,10 @@ enabled = true
 verify_jwt = false
 
 # enrich-environment is NOT cron-only — it is invoked from the sync pipeline
-# with a real user JWT, so Edge-layer JWT verification stays on.
+# with a real user JWT, so Edge-layer JWT verification stays on. The handler
+# additionally self-gates in-code: the JWT's user must own the observation,
+# or the caller must present X-Cron-Secret (the cron path only becomes
+# reachable if this flag is ever flipped to false — pg_cron sends no bearer).
 [functions.enrich-environment]
 enabled = true
 verify_jwt = true
