@@ -361,7 +361,7 @@ const isEs = lang === 'es';
 const tr = t(lang);
 
 let pipelineState: PipelineState | null = null;
-let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
+let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null; capturedFrom: 'gps' | 'manual' } | null = null;
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
 let identifyErrorReason: string | null = null;
 let cardAttempts: import('../lib/identify-cascade-client').IdentifyAttempt[] = [];
@@ -1171,15 +1171,20 @@ function startGPS() {
   if (gpsStatus) gpsStatus.textContent = isEs ? 'Obteniendo GPS...' : 'Acquiring GPS...';
   navigator.geolocation.getCurrentPosition(
     pos => {
+      // The observer's explicit map pick is sovereign over a late GPS fix.
+      if (location?.capturedFrom === 'manual') return;
       location = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         accuracyM: pos.coords.accuracy,
         altitudeM: pos.coords.altitude,
+        capturedFrom: 'gps',
       };
       if (gpsStatus) gpsStatus.textContent = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)} (±${Math.round(location.accuracyM)}m)`;
-      // Notify map picker
-      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+      // Notify map picker. The obs2 picker is mode="edit", which only
+      // listens to `rastrum:mappicker-set-initial` (`-set` hydrates
+      // view-mode pickers and is a silent no-op here).
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
         detail: { id: 'obs2-map', coords: { lat: location.lat, lng: location.lng } },
       }));
       // Notify contextual chip strip (#723) — only on the first GPS fix per visit.
@@ -1193,14 +1198,41 @@ function startGPS() {
       }
     },
     (err) => {
+      if (location) return; // a map pick already resolved the location
       const msg = err.code === 1
-        ? (isEs ? 'Permiso de ubicación denegado' : 'Location permission denied')
+        ? (isEs ? 'Permiso de ubicación denegado — usa el mapa para elegir' : 'Location permission denied — use the map to pick one')
         : (isEs ? 'No se pudo obtener ubicación — usa el mapa para elegir' : 'Could not get location — use the map to pick one');
       if (gpsStatus) gpsStatus.textContent = msg;
     },
     { enableHighAccuracy: true, timeout: 20000 },
   );
 }
+
+// Map pick from the edit-mode MapPicker (pickerId "obs2-map"). This is the
+// only location path for observers without GPS — the promise in the
+// template comment ("Users without GPS can still pick a location via the
+// map") lives or dies on this listener.
+window.addEventListener('rastrum:mappicker-save', (ev) => {
+  const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
+  if (e.detail.id !== 'obs2-map') return;
+  location = {
+    lat: e.detail.coords.lat,
+    lng: e.detail.coords.lng,
+    accuracyM: 50,
+    altitudeM: null,
+    capturedFrom: 'manual',
+  };
+  if (gpsStatus) gpsStatus.textContent = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
+  // Sync the picker's initial coords so re-opening the modal centers on
+  // the pick instead of the default Mexico view.
+  window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+    detail: { id: 'obs2-map', coords: { lat: location.lat, lng: location.lng } },
+  }));
+  if (pipelineState) {
+    const locNode = pipelineState.nodes.find(n => n.kind === 'location');
+    if (locNode) setNodeState(pipelineState, locNode.id, 'done');
+  }
+});
 
 // ── Show post form ─────────────────────────────────────────────────────────
 function showPostForm() {
@@ -1315,10 +1347,15 @@ postForm?.addEventListener('submit', async (e) => {
     const observerOwned = observerAffirmed || (!!taxonInput && taxonInput !== machineName);
     const identifiedSpecies = taxonInput || observerAffirmedTaxon || machineName;
 
+    // No GPS fix and no map pick → save as a draft (sync engine skips it
+    // until a location is added) instead of syncing a (0,0) null-island
+    // record that ExploreMap filters out. Mirrors QuickObserveSheet.
+    const savedAsDraft = !location;
     const obs = await saveObservationToOutbox({
       observerRef,
       media: mediaInputs,
       location: location ?? { lat: 0, lng: 0, accuracyM: 0, altitudeM: null, capturedFrom: 'gps' },
+      asDraft: savedAsDraft,
       identification: identifiedSpecies ? {
         scientificName: identifiedSpecies,
         confidence: observerOwned ? 0 : (bestResult?.confidence ?? 0),
@@ -1382,7 +1419,14 @@ postForm?.addEventListener('submit', async (e) => {
     postForm?.classList.add('hidden');
     successEl?.classList.remove('hidden');
     const linkEl = document.getElementById('obs2-success-link');
-    if (linkEl && obs.id) {
+    if (linkEl && savedAsDraft) {
+      // Drafts never sync, so the "View observation" link (and its
+      // "Syncing…" gate) would dead-end. Tell the truth instead.
+      const draftMsg = document.createElement('span');
+      draftMsg.className = 'text-zinc-600 dark:text-zinc-400 text-sm';
+      draftMsg.textContent = tr.observe.draft_saved_offline;
+      linkEl.replaceChildren(draftMsg);
+    } else if (linkEl && obs.id) {
       // The /share/obs/?id= page reads from Supabase, so it 404s
       // ("Observation not found") until the outbox row reaches the
       // server. Gate the CTA on the existing sync-row-done event
@@ -1429,7 +1473,9 @@ postForm?.addEventListener('submit', async (e) => {
     toastEl.setAttribute('role', 'status');
     toastEl.setAttribute('aria-live', 'polite');
     toastEl.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-emerald-700 text-white px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none transition-opacity duration-300';
-    toastEl.textContent = isEs ? '¡Observación guardada!' : 'Observation saved!';
+    toastEl.textContent = savedAsDraft
+      ? tr.observe.draft_saved_offline
+      : (isEs ? '¡Observación guardada!' : 'Observation saved!');
     document.body.appendChild(toastEl);
     setTimeout(() => { toastEl.style.opacity = '0'; setTimeout(() => toastEl.remove(), 300); }, 3000);
   } catch (err) {
@@ -1444,6 +1490,11 @@ postForm?.addEventListener('submit', async (e) => {
 // ── New observation ────────────────────────────────────────────────────────
 document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   location = null;
+  // Clear the picker's stale pin from the previous observation.
+  window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+    detail: { id: 'obs2-map', coords: null },
+  }));
+  if (gpsStatus) gpsStatus.textContent = isEs ? 'Obteniendo GPS...' : 'Acquiring GPS...';
   bestResult = null;
   identifyErrorReason = null;
   cardAttempts = [];
