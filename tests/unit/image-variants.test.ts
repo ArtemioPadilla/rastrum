@@ -1,27 +1,34 @@
 /**
  * PBI 2.1 (#1193) — image-variants URL builder.
- * Pins the AVIF/WebP/multi-width contract so a careless change to the
+ * Pins the AVIF/multi-width contract so a careless change to the
  * Cloudflare resizing URL shape (or the host allowlist) trips this gate.
+ *
+ * Post-incident (cdn-cgi 503 outage): the plan includes 5,000 unique
+ * transformations/month, so the matrix is pinned at 2 widths × AVIF only
+ * = exactly 2 variants per photo. WebP is gone — `webpSrcset` must stay
+ * empty so the quota isn't silently doubled by a re-added format.
  */
 import { describe, it, expect } from 'vitest';
 import { buildImageVariants, EXPLORE_CARD_SIZES } from '../../src/lib/image-variants';
 
 describe('buildImageVariants', () => {
-  it('emits AVIF + WebP srcsets at 320/640/1280 for media.rastrum.org', () => {
+  it('emits an AVIF-only srcset at 320/640 for media.rastrum.org', () => {
     const v = buildImageVariants('https://media.rastrum.org/observations/abc/primary.jpg');
     expect(v.hasVariants).toBe(true);
     expect(v.fallback).toBe('https://media.rastrum.org/observations/abc/primary.jpg');
     expect(v.avifSrcset).toContain('format=avif');
     expect(v.avifSrcset).toContain('width=320');
     expect(v.avifSrcset).toContain('width=640');
-    expect(v.avifSrcset).toContain('width=1280');
     expect(v.avifSrcset).toMatch(/ 320w/);
     expect(v.avifSrcset).toMatch(/ 640w/);
-    expect(v.avifSrcset).toMatch(/ 1280w/);
-    expect(v.webpSrcset).toContain('format=webp');
-    expect(v.webpSrcset).toContain('width=320');
-    expect(v.webpSrcset).toContain('width=640');
-    expect(v.webpSrcset).toContain('width=1280');
+  });
+
+  it('emits exactly 2 AVIF entries and no WebP (5,000 transforms/month quota)', () => {
+    const v = buildImageVariants('https://media.rastrum.org/observations/abc/primary.jpg');
+    expect(v.avifSrcset.split(', ')).toHaveLength(2);
+    expect(v.avifSrcset).not.toContain('width=1280');
+    expect(v.avifSrcset).not.toContain('format=webp');
+    expect(v.webpSrcset).toBe('');
   });
 
   it('rewrites onto the same host via /cdn-cgi/image/ so R2 binding stays intact', () => {
@@ -56,12 +63,12 @@ describe('buildImageVariants', () => {
     expect(v.avifSrcset).toBe('');
   });
 
-  it('accepts a custom widths list for tiny thumbnails', () => {
+  it('accepts a custom widths list for tiny thumbnails — still AVIF-only', () => {
     const v = buildImageVariants('https://media.rastrum.org/observations/abc/primary.jpg', [80, 160]);
     expect(v.avifSrcset).toMatch(/ 80w/);
     expect(v.avifSrcset).toMatch(/ 160w/);
     expect(v.avifSrcset).not.toMatch(/ 320w/);
-    expect(v.avifSrcset).not.toMatch(/ 1280w/);
+    expect(v.webpSrcset).toBe('');
   });
 
   it('exposes the explore-card sizes attribute', () => {
