@@ -752,6 +752,12 @@ Full context: `docs/runbooks/observe-progressive-card.md` + the spec
 |---|---|---|
 | Dynamic `await import('../lib/foo')` 404s as `/<page-path>/lib/foo` (not `/_astro/...`) | `<script define:vars={...}>` implicitly sets `is:inline=true` → no bundling, so the dynamic import ships as raw text and resolves against the page URL | Drop `define:vars`; read state from the DOM (`document.documentElement.lang`) or `data-*` attributes on a wrapper element. CI guard: `scripts/check-define-vars-imports.sh` (wired in `.github/workflows/ci.yml`). Pattern fixed in PRs #825 (kairos/streak-push) and the follow-up (surprises/pool-donate). |
 
+### Pitfalls discovered 2026-06-09 — image variants + cdn-cgi
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Every observation photo on `/explore/recent/` renders broken (alt text only) while the raw `media.rastrum.org/...jpg` URL returns 200 | `src/lib/image-variants.ts` (PR #1206) emits `<picture>` sources via Cloudflare Image Transformations (`/cdn-cgi/image/...`). When the feature is disabled for the zone — or the **5,000 unique-transformations/month quota** is exhausted — those URLs return 503, and `<picture>` does NOT fall back to the raw `<img src>` on a network failure of the selected source. e2e can't catch it (runs against the local build, not the production CDN). | Operator: keep Image Transformations enabled (re-enabled 2026-06-11). Code: `onerror` fallback that strips the `<source>`s, keep the variant matrix small (quota = widths × formats × unique photos/month), and probe a `cdn-cgi/image` URL in `infra/smoke-model-assets.sh`. Long-term: client-side thumbnail at upload (see `docs/site-and-code-audit-2026-06-09.md` §1.1) removes the dependency entirely. |
+
 ### Pitfalls discovered 2026-05-13 — TZ-determinism in tests
 
 | Symptom | Cause | Fix |
