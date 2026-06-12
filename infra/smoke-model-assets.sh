@@ -9,6 +9,9 @@
 # but the file behind it is unreachable, has the wrong content-length,
 # or returns no `access-control-allow-origin` header.
 #
+# SMOKE_CDN_IMAGE_PROBE_URL (optional) additionally probes the
+# Cloudflare Image Transformations endpoint — see check_cdn_image below.
+#
 # Wired into:
 #   - .github/workflows/deploy.yml (post-build, after `npm run build`)
 #   - .github/workflows/nightly-smoke.yml (09:17 UTC daily)
@@ -68,6 +71,52 @@ check() {
   printf "        ✓ %s%s, CORS=%s\n" "$status_line" "${len:+, $len bytes}" "$cors"
 }
 
+# Cloudflare Image Transformations probe (cdn-cgi 503 incident, PBI 2.1).
+# SMOKE_CDN_IMAGE_PROBE_URL is a known-stable observation photo on
+# media.rastrum.org; we request the exact width=320 AVIF variant the
+# explore cards emit (same source + options combo = no extra unique
+# transformation against the 5,000/month quota) and assert HTTP 200 +
+# an image content-type. Catches the feature being disabled or the
+# quota exhausted before users see degraded cards. No CORS assertion —
+# variants load via <img>/<picture>, not fetch().
+check_cdn_image() {
+  local label="cdn-cgi image"
+  local url="${SMOKE_CDN_IMAGE_PROBE_URL:-}"
+
+  if [[ -z "$url" ]]; then
+    printf "  skip  %-22s (env var not configured)\n" "$label"
+    return 0
+  fi
+
+  local path="${url#*://*/}"
+  local probe="https://media.rastrum.org/cdn-cgi/image/width=320,format=avif,fit=cover,quality=80/${path}"
+
+  checked=$((checked + 1))
+  printf "  ▶     %-22s → %s\n" "$label" "$probe"
+
+  local headers
+  if ! headers=$(curl -fsSI --max-time 30 "$probe" 2>&1); then
+    printf "        ✗ unreachable — transformations disabled or quota exhausted? %s\n" "$headers"
+    failed=$((failed + 1))
+    return 1
+  fi
+
+  headers=${headers//$'\r'/}
+
+  local status_line
+  status_line=$(printf "%s" "$headers" | head -n1)
+  local ctype
+  ctype=$(printf "%s" "$headers" | grep -i '^content-type:' | head -1 | awk '{print $2}')
+
+  if [[ "$ctype" != image/* ]]; then
+    printf "        ✗ content-type=%s is not an image — transformation not applied?\n" "${ctype:-<missing>}"
+    failed=$((failed + 1))
+    return 1
+  fi
+
+  printf "        ✓ %s, content-type=%s\n" "$status_line" "$ctype"
+}
+
 echo "Smoke-testing on-device model assets…"
 echo
 
@@ -86,6 +135,9 @@ check "pmtiles MX"       "${PUBLIC_PMTILES_MX_URL:-}" 30000000
 # MegaDetector v5a INT8 ONNX. ~134 MB — the wire format the on-device
 # camera-trap plugin expects.
 check "MegaDetector v5a" "${PUBLIC_MEGADETECTOR_WEIGHTS_URL:+${PUBLIC_MEGADETECTOR_WEIGHTS_URL%/}/megadetector_v5a.onnx}" 100000000
+
+# Cloudflare Image Transformations (explore-card AVIF variants).
+check_cdn_image
 
 echo
 if [[ "$failed" -eq 0 ]]; then

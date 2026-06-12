@@ -6,8 +6,10 @@
  * thumbnail shipped at the full 1200 px R2 upload size with no AVIF/WebP
  * fallback. This spec pins:
  *   - `fetchpriority="high"` appears in the card-render template
- *   - `<picture>` wraps the card image with AVIF + WebP sources
- *   - the `<img>` srcset (via <source>) ships at least 3 widths
+ *   - `<picture>` wraps the card image with an AVIF-only source
+ *     (WebP dropped post-incident — 5,000 transforms/month quota)
+ *   - the `<img>` carries a guarded onerror that strips <source>s so a
+ *     cdn-cgi 503 degrades to the raw upload instead of a broken image
  *   - the first card is the LCP candidate (i === 0 → isLCP=true)
  */
 import { describe, it, expect } from 'vitest';
@@ -48,27 +50,38 @@ describe('PBI 2.1 — ExploreRecentView LCP fix', () => {
     expect(source).toMatch(/rowMarkup\([^)]*isLCP\)/);
   });
 
-  it('wraps card thumbs in <picture> with AVIF + WebP <source> elements', () => {
+  it('wraps card thumbs in <picture> with an AVIF-only <source>', () => {
     expect(source).toContain('<picture>');
     expect(source).toContain('type="image/avif"');
-    expect(source).toContain('type="image/webp"');
+    // WebP dropped post-incident — never emit an (empty) webp <source>,
+    // and never re-add it without revisiting the transformations quota.
+    expect(source).not.toContain('type="image/webp"');
     expect(source).toContain('</picture>');
   });
 
-  it('emits responsive srcset on each <source>', () => {
-    // We pass avifSrcset / webpSrcset into srcset attributes on the sources.
+  it('emits responsive srcset on the AVIF <source>', () => {
     expect(source).toMatch(/srcset="\$\{escapeText\(v\.avifSrcset\)\}"/);
-    expect(source).toMatch(/srcset="\$\{escapeText\(v\.webpSrcset\)\}"/);
+    expect(source).not.toContain('v.webpSrcset');
   });
 
   it('uses the EXPLORE_CARD_SIZES attribute on the card <source>', () => {
     expect(source).toContain('sizes="${EXPLORE_CARD_SIZES}"');
   });
 
+  it('degrades to the raw upload when a cdn-cgi variant errors', () => {
+    // <picture> does NOT fall back to <img src> on a network-level
+    // <source> failure (503 = quota exhausted / feature disabled), so the
+    // injected markup carries a guarded inline onerror that removes the
+    // <source> siblings and reloads the raw src — at most once.
+    expect(source).toContain('onerror=');
+    expect(source).toMatch(/this\.dataset\.degraded/);
+    expect(source).toMatch(/querySelectorAll\('source'\)/);
+  });
+
   it('uses a small custom srcset for the 56px list-view thumb', () => {
-    // List thumb is w-14 (56 px); we pass [80, 160, 240] to keep the
-    // srcset compact and the sizes attr fixed at 56px.
-    expect(source).toMatch(/buildImageVariants\(photo,\s*\[80,\s*160,\s*240\]\)/);
+    // List thumb is w-14 (56 px); 80/160 covers 1×–2× DPR. 240 (3×) was
+    // dropped with the quota shrink.
+    expect(source).toMatch(/buildImageVariants\(photo,\s*\[80,\s*160\]\)/);
     expect(source).toContain('sizes="56px"');
   });
 

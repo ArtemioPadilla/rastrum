@@ -272,6 +272,15 @@ const distancePage = page as unknown as Record<string, string>;
     return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
   }
 
+  // <picture> never falls back to <img src> when the selected <source>
+  // fails at the network level — a cdn-cgi 503 (transformations disabled
+  // or monthly quota exhausted) renders a broken image. This onerror
+  // strips the <source> siblings and reloads the raw upload instead.
+  // Inline because the cards are injected via innerHTML (addEventListener
+  // would miss images that error before wiring); the data-degraded guard
+  // makes it one-shot so a failing raw URL can't loop.
+  const CDN_DEGRADE_ONERROR = `onerror="if(this.dataset.degraded)return;this.dataset.degraded='1';var p=this.parentElement;if(p&&p.tagName==='PICTURE')p.querySelectorAll('source').forEach(function(s){s.remove()});this.src=this.src;"`;
+
   function colorForConfidence(c: number): string {
     if (c >= 0.85) return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300/60 dark:border-emerald-700/60';
     if (c >= 0.5)  return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300/60 dark:border-amber-700/60';
@@ -409,18 +418,18 @@ const distancePage = page as unknown as Record<string, string>;
     // PBI 2.1 (#1193): the first card is the LCP candidate — it gets
     // fetchpriority=high + loading=eager so the browser stops deferring it
     // behind the icon/sprite waterfall. Everything else stays lazy. When the
-    // URL is on a Cloudflare resizing host we also emit AVIF + WebP variants
-    // via <picture> so the worker negotiates the best format per client.
+    // URL is on a Cloudflare resizing host we also emit AVIF sized variants
+    // via <picture> (AVIF-only post-incident — see image-variants.ts).
     let photoHtml = '';
     if (photo) {
       const v = buildImageVariants(photo);
       const loadAttrs = isLCPCandidate
         ? 'loading="eager" fetchpriority="high"'
         : 'loading="lazy" fetchpriority="auto"';
-      const imgTag = `<img src="${escapeText(v.fallback)}" alt="${escapeText(sci)}" ${loadAttrs} decoding="async" class="w-full h-full object-cover" />`;
+      const imgAttrs = `src="${escapeText(v.fallback)}" alt="${escapeText(sci)}" ${loadAttrs} decoding="async" class="w-full h-full object-cover"`;
       photoHtml = v.hasVariants
-        ? `<picture><source type="image/avif" srcset="${escapeText(v.avifSrcset)}" sizes="${EXPLORE_CARD_SIZES}" /><source type="image/webp" srcset="${escapeText(v.webpSrcset)}" sizes="${EXPLORE_CARD_SIZES}" />${imgTag}</picture>`
-        : imgTag;
+        ? `<picture><source type="image/avif" srcset="${escapeText(v.avifSrcset)}" sizes="${EXPLORE_CARD_SIZES}" /><img ${imgAttrs} ${CDN_DEGRADE_ONERROR} /></picture>`
+        : `<img ${imgAttrs} />`;
     }
 
     const obsAriaLabel = labels.observationLinkAria.replace('{species}', sci);
@@ -665,15 +674,16 @@ const distancePage = page as unknown as Record<string, string>;
           ? `<span class="absolute bottom-1 right-1 inline-flex items-center rounded bg-black/60 px-1 py-0.5 text-[9px] text-white font-semibold">📷${photoMedia.length}</span>`
           : '';
       // PBI 2.1 — list-view thumb is fixed 56 px (w-14), so srcset only
-      // needs 1× / 2× / 3× widths. Lazy + auto priority for every list row
-      // since none of them are the page's LCP element.
+      // needs 1× / 2× widths (3× dropped against the transformations
+      // quota). Lazy + auto priority for every list row since none of
+      // them are the page's LCP element.
       let listThumbHtml = '';
       if (photo) {
-        const v = buildImageVariants(photo, [80, 160, 240]);
-        const imgTag = `<img src="${escapeText(v.fallback)}" alt="${escapeText(sciText)}" loading="lazy" decoding="async" class="w-full h-full object-cover" />`;
+        const v = buildImageVariants(photo, [80, 160]);
+        const imgAttrs = `src="${escapeText(v.fallback)}" alt="${escapeText(sciText)}" loading="lazy" decoding="async" class="w-full h-full object-cover"`;
         const picture = v.hasVariants
-          ? `<picture><source type="image/avif" srcset="${escapeText(v.avifSrcset)}" sizes="56px" /><source type="image/webp" srcset="${escapeText(v.webpSrcset)}" sizes="56px" />${imgTag}</picture>`
-          : imgTag;
+          ? `<picture><source type="image/avif" srcset="${escapeText(v.avifSrcset)}" sizes="56px" /><img ${imgAttrs} ${CDN_DEGRADE_ONERROR} /></picture>`
+          : `<img ${imgAttrs} />`;
         listThumbHtml = `<div class="relative w-14 h-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">${picture}${mediaBadge}</div>`;
       }
       const thumb = photo
