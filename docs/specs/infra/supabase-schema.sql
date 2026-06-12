@@ -318,6 +318,54 @@ ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS review_requested boolea
 CREATE INDEX IF NOT EXISTS idx_obs_review_requested
   ON public.observations(review_requested) WHERE review_requested = true;
 
+-- ── 2026-06 audit F1: public-safe coordinate column ─────────────────────────
+-- RLS gates rows, not columns: obs_public_read admits sensitive rows whose
+-- location_obscured is set, but the table-level SELECT grant exposed the
+-- precise `location` column on those very rows
+-- (GET /rest/v1/observations?select=location&obscure_level=eq.5km leaked
+-- exact coordinates). The fix is column-level SELECT grants (see the
+-- "OBSERVATIONS COLUMN-LEVEL SELECT" block near the end of this file —
+-- it must run AFTER every ADD COLUMN, so it lives at the bottom).
+--
+-- `location_public` is the always-safe coordinate every public surface
+-- (explore map, species map, share page, pins view, chat cards) reads
+-- instead of `location`:
+--   obscure_level = 'none'  → precise location (observer opted into public)
+--   anything else           → location_obscured (NULL if not yet coarsened,
+--                             in which case obs_public_read hides the row
+--                             from non-owners anyway)
+-- GENERATED ALWAYS … STORED keeps it in sync with zero trigger surface.
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS location_public
+  geography(Point, 4326) GENERATED ALWAYS AS (
+    CASE WHEN obscure_level = 'none' THEN location ELSE location_obscured END
+  ) STORED;
+CREATE INDEX IF NOT EXISTS idx_obs_location_public
+  ON public.observations USING GIST(location_public);
+
+-- Owner-only precise-coordinate reader. Column grants cannot be
+-- row-conditional, so after `location` is revoked from anon/authenticated
+-- the observer reads their own precise coords through this SECURITY DEFINER
+-- function (a security_invoker view would re-check the column grant and
+-- fail). Internal observer_id = auth.uid() filter means a non-owner gets
+-- zero rows, never an error. NULL p_observation_ids = all own observations
+-- (used by the DwC export).
+CREATE OR REPLACE FUNCTION public.get_own_observation_locations(
+  p_observation_ids uuid[] DEFAULT NULL
+)
+RETURNS TABLE (observation_id uuid, lat double precision, lng double precision)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT o.id, ST_Y(o.location::geometry), ST_X(o.location::geometry)
+  FROM public.observations o
+  WHERE o.observer_id = (SELECT auth.uid())
+    AND o.location IS NOT NULL
+    AND (p_observation_ids IS NULL OR o.id = ANY(p_observation_ids));
+$$;
+
+REVOKE ALL ON FUNCTION public.get_own_observation_locations(uuid[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_own_observation_locations(uuid[]) TO authenticated, service_role;
+
 -- ============================================================
 -- IDENTIFICATIONS
 -- ============================================================
@@ -2719,11 +2767,11 @@ CREATE OR REPLACE VIEW public.profile_observation_pins AS
 SELECT
   o.observer_id,
   o.id AS observation_id,
-  CASE
-    WHEN o.location_obscured IS NOT NULL
-      THEN o.location_obscured
-    ELSE o.location
-  END AS location,
+  -- 2026-06 audit F1: location_public (obscured for sensitive rows, precise
+  -- only when obscure_level='none'). The previous CASE fell back to the
+  -- precise location when a sensitive row had no obscured point, and — being
+  -- a security_invoker view — would now fail the column-level SELECT grant.
+  o.location_public AS location,
   i.scientific_name,
   i.is_research_grade,
   o.observed_at
@@ -3042,7 +3090,11 @@ WITH base AS (
   LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = i.taxon_id
   WHERE
     o.sync_status = 'synced'
-    AND o.obscure_level <> 'private'
+    -- 2026-06 audit F3: was `<> 'private'` — a value the obscure_level enum
+    -- never holds (none/0.1deg/0.2deg/5km/full), so the filter was a no-op
+    -- and fully-obscured observations leaked into the dex. Sibling views
+    -- (profile_observation_pins, profile_stats_counts) use `<> 'full'`.
+    AND o.obscure_level <> 'full'
     AND i.scientific_name IS NOT NULL
     AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
   GROUP BY
@@ -8095,12 +8147,44 @@ SET search_path = public
 AS $$
 DECLARE
   v_id uuid;
+  v_uid uuid := auth.uid();
+  v_confidence numeric := LEAST(GREATEST(p_confidence, 0), 1);
 BEGIN
+  -- 2026-06 audit F2: this function is SECURITY DEFINER and granted to
+  -- `authenticated`, so without an internal ownership check any logged-in
+  -- user could hijack the primary ID on anyone's observation. A NULL
+  -- auth.uid() means the caller is NOT an end-user JWT — only
+  -- `service_role` (the identify Edge Function) can reach that state,
+  -- because EXECUTE is revoked from PUBLIC/anon. Service context is
+  -- trusted; every end-user must own the observation.
+  IF v_uid IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.observations
+      WHERE id = p_observation_id AND observer_id = v_uid
+    ) THEN
+      RAISE EXCEPTION 'not_observation_owner'
+        USING ERRCODE = '42501',
+              HINT = 'Only the observer can set identifications on this observation.';
+    END IF;
+  END IF;
+
+  -- Mirror of the identifications_source_check CHECK constraint. Validated
+  -- here too so a bad source fails loudly BEFORE the demote UPDATE runs,
+  -- with a clean error instead of a constraint violation.
+  IF p_source IS NULL OR p_source NOT IN (
+    'plantnet','claude_haiku','claude_sonnet','onnx_offline','human',
+    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision',
+    'bedrock','openai','azure_openai','gemini','vertex_ai'
+  ) THEN
+    RAISE EXCEPTION 'invalid_identification_source: %', coalesce(p_source, 'NULL')
+      USING ERRCODE = '23514';
+  END IF;
+
   UPDATE public.identifications
   SET is_primary = false
   WHERE observation_id = p_observation_id
     AND is_primary IS TRUE
-    AND confidence < p_confidence;
+    AND confidence < v_confidence;
 
   IF EXISTS (
     SELECT 1 FROM public.identifications
@@ -8112,7 +8196,7 @@ BEGIN
     )
     VALUES (
       p_observation_id, p_scientific_name, p_taxon_id,
-      p_confidence, p_source, p_raw_response, false
+      v_confidence, p_source, p_raw_response, false
     )
     RETURNING id INTO v_id;
   ELSE
@@ -8122,7 +8206,7 @@ BEGIN
     )
     VALUES (
       p_observation_id, p_scientific_name, p_taxon_id,
-      p_confidence, p_source, p_raw_response, true
+      v_confidence, p_source, p_raw_response, true
     )
     RETURNING id INTO v_id;
   END IF;
@@ -9038,14 +9122,17 @@ BEGIN
   WITH nearby AS (
     SELECT
       i.taxon_id,
-      ST_Distance(o.location, v_point) AS distance_m,
+      -- 2026-06 audit F1: location_public, not location — this function is
+      -- SECURITY INVOKER and anon/authenticated no longer hold SELECT on
+      -- the precise column. Coarsened coords are fine for a 50 km aggregate.
+      ST_Distance(o.location_public, v_point) AS distance_m,
       o.observer_id
     FROM public.observations o
     JOIN public.identifications i
       ON i.observation_id = o.id AND i.is_primary = true
-    WHERE o.location IS NOT NULL
+    WHERE o.location_public IS NOT NULL
       AND i.taxon_id IS NOT NULL
-      AND ST_DWithin(o.location, v_point, 50000)
+      AND ST_DWithin(o.location_public, v_point, 50000)
       AND EXTRACT(MONTH FROM o.observed_at AT TIME ZONE 'UTC')::int = ANY(v_months)
       AND (i.is_research_grade = true OR o.primary_taxon_id IS NOT NULL)
   ),
@@ -10214,7 +10301,10 @@ AS $$
     SELECT
       o.id, o.observer_id, o.observed_at,
       o.primary_taxon_id, o.obscure_level,
-      o.location, o.location_obscured,
+      -- 2026-06 audit F1: SECURITY INVOKER + column-level grants — the
+      -- precise `location` column is no longer readable here. Owner-precise
+      -- coords come from the SECURITY DEFINER helper in the outer query.
+      o.location_public,
       o.state_province, o.notes,
       COALESCE(i.is_research_grade, false) AS is_research_grade,
       t.scientific_name, t.common_name_es, t.common_name_en,
@@ -10247,13 +10337,9 @@ AS $$
       'state_province',  o.state_province,
       'is_research_grade', o.is_research_grade,
       'obscure_level',   o.obscure_level,
-      'lat', CASE WHEN auth.uid() = o.observer_id
-                  THEN ST_Y(o.location::geometry)
-                  ELSE ST_Y(coalesce(o.location_obscured, o.location)::geometry) END,
-      'lng', CASE WHEN auth.uid() = o.observer_id
-                  THEN ST_X(o.location::geometry)
-                  ELSE ST_X(coalesce(o.location_obscured, o.location)::geometry) END,
-      'coords_obscured', (auth.uid() IS DISTINCT FROM o.observer_id AND o.location_obscured IS NOT NULL)
+      'lat', COALESCE(own.lat, ST_Y(o.location_public::geometry)),
+      'lng', COALESCE(own.lng, ST_X(o.location_public::geometry)),
+      'coords_obscured', (auth.uid() IS DISTINCT FROM o.observer_id AND o.obscure_level <> 'none')
     ),
     'suggested_questions', jsonb_build_array(
       'Why is this ' || CASE WHEN o.is_research_grade THEN 'research grade' ELSE 'needs review' END || '?',
@@ -10265,7 +10351,10 @@ AS $$
       'observer_id',      o.observer_id::text
     )
   ) END
-  FROM o;
+  FROM o
+  -- SECURITY DEFINER helper: returns a row only when the caller owns the
+  -- observation, so owners still see their precise coords in the chat card.
+  LEFT JOIN LATERAL public.get_own_observation_locations(ARRAY[o.id]) own ON true;
 $$;
 
 DROP FUNCTION IF EXISTS public.chat_species_card(text);
@@ -10606,7 +10695,8 @@ BEGIN
       WHERE (NOT v_owner_self    OR o.observer_id = auth.uid())
         AND (v_taxon_id    IS NULL OR o.primary_taxon_id = v_taxon_id)
         AND (v_project_id  IS NULL OR o.project_id      = v_project_id)
-        AND (v_near_obs    IS NULL OR ST_DWithin(o.location, near.location, v_radius_km * 1000))
+        -- 2026-06 audit F1: location_public — SECURITY INVOKER, see chat_obs_card.
+        AND (v_near_obs    IS NULL OR ST_DWithin(o.location_public, near.location_public, v_radius_km * 1000))
         AND (NOT v_research_only OR COALESCE(i.is_research_grade, false) = true)
       ORDER BY o.observed_at DESC
       LIMIT greatest(1, least(p_limit, 50))
@@ -12132,14 +12222,17 @@ BEGIN
   WITH nearby AS (
     SELECT
       i.taxon_id,
-      ST_Distance(o.location, v_point) AS distance_m,
+      -- 2026-06 audit F1: location_public, not location — this function is
+      -- SECURITY INVOKER and anon/authenticated no longer hold SELECT on
+      -- the precise column. Coarsened coords are fine for a 50 km aggregate.
+      ST_Distance(o.location_public, v_point) AS distance_m,
       o.observer_id
     FROM public.observations o
     JOIN public.identifications i
       ON i.observation_id = o.id AND i.is_primary = true
-    WHERE o.location IS NOT NULL
+    WHERE o.location_public IS NOT NULL
       AND i.taxon_id IS NOT NULL
-      AND ST_DWithin(o.location, v_point, 50000)
+      AND ST_DWithin(o.location_public, v_point, 50000)
       AND EXTRACT(MONTH FROM o.observed_at AT TIME ZONE 'UTC')::int = ANY(v_months)
       AND (i.is_research_grade = true OR o.primary_taxon_id IS NOT NULL)
   ),
@@ -13182,3 +13275,89 @@ $taxa_dedup$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS taxa_scientific_name_key
   ON public.taxa (scientific_name);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- OBSERVATIONS COLUMN-LEVEL SELECT (2026-06 audit F1)
+-- ════════════════════════════════════════════════════════════════════════
+-- RLS gates rows, not columns. obs_public_read admits sensitive rows (the
+-- ones with location_obscured set), and the blanket table-level SELECT
+-- grant near the top of this file exposed the precise `location` column on
+-- exactly those rows. Column-level REVOKE does NOT subtract from a
+-- table-level GRANT, so the mechanism is: revoke table-level SELECT, then
+-- re-grant an explicit column list that excludes `location`.
+--
+-- Readers use `location_public` (generated column, defined right after the
+-- observations CREATE TABLE). Owners read their own precise coords via the
+-- SECURITY DEFINER `get_own_observation_locations()` RPC. INSERT/UPDATE/
+-- DELETE grants are untouched — owners still write `location` directly
+-- (and via update_observation_location()).
+--
+-- This block MUST stay at the END of the file: it enumerates columns that
+-- are added by ALTER TABLE statements scattered above, and the blanket
+-- `GRANT SELECT ON ALL TABLES` near the top re-grants table-level SELECT
+-- on every replay, which this block then narrows again.
+--
+-- ⚠ MAINTENANCE: any future `ALTER TABLE public.observations ADD COLUMN`
+-- must ALSO add the column here, or anon/authenticated reads of it will
+-- fail with "permission denied" in production (PostgREST `select=*`
+-- expands to ALL columns and fails outright if any is ungranted — client
+-- code must use explicit column lists on this table).
+REVOKE SELECT ON public.observations FROM anon, authenticated;
+GRANT SELECT (
+  id,
+  observer_id,
+  observed_at,
+  location_obscured,
+  location_public,
+  accuracy_m,
+  altitude_m,
+  location_source,
+  state_province,
+  municipality,
+  locality,
+  primary_taxon_id,
+  obscure_level,
+  habitat,
+  weather,
+  notes,
+  individual_count,
+  evidence_type,
+  content_sensitive,
+  license,
+  moon_phase,
+  moon_illumination,
+  photoperiod_hours,
+  temp_celsius,
+  precipitation_24h_mm,
+  precipitation_7d_mm,
+  days_since_rain,
+  post_rain_flag,
+  weather_tag,
+  ndvi_value,
+  phenological_season,
+  fire_proximity_km,
+  captured_at,
+  device_make,
+  device_model,
+  gps_direction_deg,
+  media_quality_score,
+  sync_status,
+  app_version,
+  device_os,
+  created_at,
+  updated_at,
+  review_requested,
+  establishment_means,
+  hidden,
+  hidden_reason,
+  hidden_at,
+  hidden_by,
+  last_material_edit_at,
+  project_id,
+  camera_station_id,
+  place_id,
+  identification_status,
+  is_range_extension,
+  life_stage,
+  vital_status
+) ON public.observations TO anon, authenticated;

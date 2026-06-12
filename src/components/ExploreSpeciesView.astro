@@ -268,7 +268,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
   type ObsRow = {
     id: string;
-    location: GeoJSON.Point | null;
+    location_public: GeoJSON.Point | null;
     observed_at: string;
     media_files: { url: string | null; thumbnail_url?: string | null; is_primary: boolean | null; media_type?: string | null; deleted_at?: string | null }[];
   };
@@ -1454,7 +1454,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     try {
       const { data, error } = await supabase
         .from('observations')
-        .select('id, location, observed_at, media_files(url, thumbnail_url, is_primary, media_type, deleted_at)')
+        .select('id, location_public, observed_at, media_files(url, thumbnail_url, is_primary, media_type, deleted_at)')
         .eq('sync_status', 'synced')
         .eq('primary_taxon_id', taxon.id)
         .order('observed_at', { ascending: false })
@@ -1481,7 +1481,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     if (mapEl) {
       const features: GeoJSON.Feature[] = [];
       for (const r of obsRows) {
-        const geom = r.location;
+        const geom = r.location_public;
         if (!geom?.coordinates) continue;
         features.push({ type: 'Feature', geometry: geom, properties: { id: r.id } });
       }

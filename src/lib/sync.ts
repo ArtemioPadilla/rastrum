@@ -135,9 +135,12 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     try {
       // Only count observations that have been fully synced to the server
       // (sync_status='synced'). Drafts or locally-pending rows don't count.
+      // select('id'), not '*': observations has column-level SELECT grants
+      // (precise `location` is owner-RPC-only) and PostgREST expands '*'
+      // to every column, which now fails with permission denied.
       const { count } = await supabase
         .from('observations')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('observer_id', observerRef.id)
         .eq('sync_status', 'synced');
       if (count === 1) {
