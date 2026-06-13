@@ -228,7 +228,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     // RLS still gates the rows.
     const { data, error } = await supabase
       .from('observations')
-      .select('id, location, location_obscured, obscure_level, observed_at, taxa:primary_taxon_id(kingdom), identifications(scientific_name, is_primary), media_files(url, thumbnail_url, is_primary, media_type)')
+      .select('id, location_public, obscure_level, observed_at, taxa:primary_taxon_id(kingdom), identifications(scientific_name, is_primary), media_files(url, thumbnail_url, is_primary, media_type)')
       .eq('sync_status', 'synced')
       .limit(500);
 
@@ -241,14 +241,10 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     for (const row of data ?? []) {
       // PostgREST returns geography columns as EWKB hex strings, not
       // GeoJSON objects. Use parseLocationToGeoJSON to decode them.
-      // Prefer location_obscured for sensitive observations (non-owner
-      // viewers should see the coarsened point, not precise coords).
-      const rawPrecise = (row as Record<string, unknown>).location;
-      const rawObscured = (row as Record<string, unknown>).location_obscured;
-      const level = (row as { obscure_level?: string }).obscure_level;
-      const precise = parseLocationToGeoJSON(rawPrecise);
-      const obscured = parseLocationToGeoJSON(rawObscured);
-      const parsed = (level && level !== 'none' && obscured?.coordinates) ? obscured : precise;
+      // location_public is the server-computed public-safe coordinate:
+      // precise when obscure_level='none', coarsened otherwise. The
+      // precise `location` column is no longer SELECT-granted to clients.
+      const parsed = parseLocationToGeoJSON((row as Record<string, unknown>).location_public);
       if (!parsed?.coordinates) continue;
       const geom: GeoJSON.Point = { type: 'Point', coordinates: parsed.coordinates };
       const observedAt = (row as { observed_at?: string | null }).observed_at ?? null;

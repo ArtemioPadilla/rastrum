@@ -1042,6 +1042,238 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- 2026-06 audit F1 — observations column-level SELECT grants
+-- (precise `location` revoked from anon/authenticated; public surfaces read
+-- the generated `location_public`; owners use get_own_observation_locations)
+-- + F2 — upsert_primary_identification ownership/source/confidence hardening
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- Seed: precise coords on the public obs (…0001, obscure_level=none) and a
+-- sensitive obs (…0003, obscure_level=5km) with precise + obscured points.
+DO $$
+BEGIN
+  UPDATE public.observations
+     SET location = ST_SetSRID(ST_MakePoint(-99.1332, 19.4326), 4326)::geography
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+  INSERT INTO public.observations
+    (id, observer_id, sync_status, obscure_level, hidden, location, location_obscured)
+  VALUES (
+    'aaaaaaaa-0000-0000-0000-000000000003',
+    '00000000-0000-0000-0000-000000000003',
+    'synced', '5km', false,
+    ST_SetSRID(ST_MakePoint(-99.1332, 19.4326), 4326)::geography,
+    ST_SetSRID(ST_MakePoint(-99.15,   19.45),   4326)::geography
+  )
+  ON CONFLICT (id) DO NOTHING;
+END $$;
+
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL ROLE anon;
+
+-- F1 test 1: anon reading observations.location → permission denied
+DO $$
+DECLARE
+  v geography;
+BEGIN
+  BEGIN
+    SELECT location INTO v FROM public.observations
+     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000003';
+    RAISE EXCEPTION 'FAIL [F1: anon can SELECT observations.location — precise coords of sensitive species leak]';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- expected
+  END;
+END $$;
+
+-- F1 test 2: anon reads location_obscured + location_public on the sensitive
+-- row, and location_public equals the coarsened point (never the precise one)
+DO $$
+DECLARE
+  v_obsc geography;
+  v_pub  geography;
+BEGIN
+  SELECT location_obscured, location_public INTO v_obsc, v_pub
+    FROM public.observations
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000003';
+  IF v_pub IS NULL THEN
+    RAISE EXCEPTION 'FAIL [F1: location_public is NULL for sensitive row — public maps would lose the coarsened point]';
+  END IF;
+  IF ST_X(v_pub::geometry) IS DISTINCT FROM ST_X(v_obsc::geometry)
+     OR ST_Y(v_pub::geometry) IS DISTINCT FROM ST_Y(v_obsc::geometry) THEN
+    RAISE EXCEPTION 'FAIL [F1: location_public on a 5km row is not the obscured point (got %, %)]',
+      ST_X(v_pub::geometry), ST_Y(v_pub::geometry);
+  END IF;
+END $$;
+
+-- F1 test 3: anon location_public on the non-sensitive row is the precise point
+DO $$
+DECLARE
+  v_pub geography;
+BEGIN
+  SELECT location_public INTO v_pub
+    FROM public.observations
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001';
+  IF v_pub IS NULL
+     OR round(ST_X(v_pub::geometry)::numeric, 4) <> -99.1332
+     OR round(ST_Y(v_pub::geometry)::numeric, 4) <> 19.4326 THEN
+    RAISE EXCEPTION 'FAIL [F1: location_public on an obscure_level=none row should be the precise point]';
+  END IF;
+END $$;
+
+-- F1 test 4: anon cannot execute get_own_observation_locations (no grant)
+DO $$
+BEGIN
+  BEGIN
+    PERFORM 1 FROM public.get_own_observation_locations(
+      ARRAY['aaaaaaaa-0000-0000-0000-000000000003']::uuid[]);
+    RAISE EXCEPTION 'FAIL [F1: anon can execute get_own_observation_locations]';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- expected
+  END;
+END $$;
+
+RESET ROLE;
+
+-- Owner context (uid_user owns both observations).
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+
+-- F1 test 5: even the owner cannot SELECT the raw location column
+-- (column grants are not row-conditional — owner path is the RPC)
+DO $$
+DECLARE
+  v geography;
+BEGIN
+  BEGIN
+    SELECT location INTO v FROM public.observations
+     WHERE id = 'aaaaaaaa-0000-0000-0000-000000000003';
+    RAISE EXCEPTION 'FAIL [F1: authenticated can SELECT observations.location]';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- expected
+  END;
+END $$;
+
+-- F1 test 6: owner reads own precise coords via the SECURITY DEFINER RPC
+DO $$
+DECLARE
+  v_lat double precision;
+  v_lng double precision;
+BEGIN
+  SELECT lat, lng INTO v_lat, v_lng
+    FROM public.get_own_observation_locations(
+      ARRAY['aaaaaaaa-0000-0000-0000-000000000003']::uuid[]);
+  IF v_lat IS NULL OR round(v_lat::numeric, 4) <> 19.4326 OR round(v_lng::numeric, 4) <> -99.1332 THEN
+    RAISE EXCEPTION 'FAIL [F1: owner did not get precise coords via get_own_observation_locations (got %, %)]', v_lat, v_lng;
+  END IF;
+END $$;
+
+-- F1 test 7: a different authenticated user gets ZERO rows from the RPC
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000002';
+DO $$
+DECLARE
+  cnt int;
+BEGIN
+  SELECT count(*)::int INTO cnt
+    FROM public.get_own_observation_locations(
+      ARRAY['aaaaaaaa-0000-0000-0000-000000000003']::uuid[]);
+  IF cnt IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [F1: non-owner read % precise location rows via get_own_observation_locations]', cnt;
+  END IF;
+END $$;
+
+-- F2 test 1: a non-owner CANNOT hijack the primary identification
+-- (uid_mod is still the active claim from F1 test 7)
+DO $$
+DECLARE
+  v uuid;
+BEGIN
+  BEGIN
+    v := public.upsert_primary_identification(
+      'aaaaaaaa-0000-0000-0000-000000000001',
+      'Hijackus maximus', NULL, 0.99, 'human', NULL);
+    RAISE EXCEPTION 'FAIL [F2: non-owner set a primary identification on another user''s observation]';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- expected
+  END;
+END $$;
+
+-- F2 test 2: owner with an invalid source is rejected before any write
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+DO $$
+DECLARE
+  v uuid;
+BEGIN
+  BEGIN
+    v := public.upsert_primary_identification(
+      'aaaaaaaa-0000-0000-0000-000000000001',
+      'Quercus testii', NULL, 0.5, 'not_a_real_source', NULL);
+    RAISE EXCEPTION 'FAIL [F2: invalid identification source accepted]';
+  EXCEPTION WHEN check_violation THEN
+    NULL; -- expected (errcode 23514)
+  END;
+END $$;
+
+-- F2 test 3: owner succeeds; out-of-range confidence is clamped to [0,1]
+DO $$
+DECLARE
+  v_id   uuid;
+  v_conf numeric;
+BEGIN
+  v_id := public.upsert_primary_identification(
+    'aaaaaaaa-0000-0000-0000-000000000001',
+    'Quercus testii', NULL, 1.7, 'human', NULL);
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'FAIL [F2: owner upsert_primary_identification returned NULL]';
+  END IF;
+  SELECT confidence INTO v_conf FROM public.identifications WHERE id = v_id;
+  IF v_conf IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'FAIL [F2: confidence not clamped to 1 (got %)]', v_conf;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- F3: profile_pokedex obscure_level filter uses a real enum value.
+-- The view previously filtered `<> 'private'` — a value obscure_level never
+-- holds — so fully-obscured ('full') observations leaked into the dex.
+DO $$
+DECLARE
+  leaked int;
+BEGIN
+  -- Seed a 'full' observation with a primary identification for uid_user.
+  -- Order matters: the identification insert fires sync_primary_id_trigger,
+  -- which recomputes obscure_level from the (here non-existent) taxon and
+  -- COALESCEs to 'none'. We must set obscure_level = 'full' *after* that, via
+  -- an observations UPDATE (which does not re-fire the identification trigger
+  -- — only observations_material_edit_check_trg runs, and it touches only
+  -- last_material_edit_at). Seeding 'full' on the initial INSERT would be
+  -- silently clobbered back to 'none' and the assertion below would falsely
+  -- "leak".
+  INSERT INTO public.observations (id, observer_id, sync_status, hidden)
+  VALUES ('aaaaaaaa-0000-0000-0000-000000000004',
+          '00000000-0000-0000-0000-000000000003', 'synced', false)
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.identifications (observation_id, scientific_name, confidence, source, is_primary)
+  VALUES ('aaaaaaaa-0000-0000-0000-000000000004', 'Occultus totalis', 0.9, 'human', true);
+  UPDATE public.observations
+     SET obscure_level = 'full'
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000004';
+
+  SELECT count(*)::int INTO leaked
+    FROM public.profile_pokedex
+   WHERE user_id = '00000000-0000-0000-0000-000000000003'
+     AND scientific_name = 'Occultus totalis';
+  IF leaked IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [F3: profile_pokedex leaks obscure_level=full observations (% rows)]', leaked;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  RAISE NOTICE '2026-06 audit F1/F2/F3 assertions passed (column grants, owner RPC, upsert ownership, pokedex filter)';
+END $$;
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- Summary
 -- ────────────────────────────────────────────────────────────────────────────
 

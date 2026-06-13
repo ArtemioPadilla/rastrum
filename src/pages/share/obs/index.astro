@@ -110,7 +110,7 @@ const lang: 'en' | 'es' = 'en';
         .from('observations')
         .select(`
           id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
-          last_material_edit_at, is_range_extension, location, location_obscured, evidence_type,
+          last_material_edit_at, is_range_extension, location_public, evidence_type,
           places:place_id(id, slug, name, place_type),
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
@@ -349,15 +349,24 @@ const lang: 'en' | 'es' = 'en';
       }
 
       // Coords readout + view-mode mini-map hydration. PostgREST returns
-      // `location` as EWKB hex for geography columns (e.g. "0101000020E6100000...").
-      // Parse it to {coordinates:[lng,lat]} before use. If it's already an object
-      // (future PostgREST versions or cached GeoJSON), use it directly.
-            // Coords readout + view-mode mini-map hydration. PostgREST returns
-      // `location` as EWKB hex for geography columns — parsed via geo.ts.
-      // For non-owner viewers we prefer `location_obscured` when present.
-      const obsLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location);
-      const obscuredLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location_obscured);
-      const usePoint = (!viewerIsObserver && obscuredLoc?.coordinates) ? obscuredLoc : obsLoc;
+      // geography columns as EWKB hex (e.g. "0101000020E6100000...") —
+      // parsed via geo.ts. `location_public` is the public-safe coordinate
+      // (precise only when obscure_level='none'); the precise `location`
+      // column is owner-RPC-only since the 2026-06 audit (F1). For the
+      // owner we fetch precise coords through the SECURITY DEFINER RPC and
+      // stash them on `obs.location` so the manage panel keeps working.
+      let usePoint = parseLocationToGeoJSON((obs as Record<string,unknown>).location_public);
+      if (viewerIsObserver) {
+        try {
+          const { data: ownLoc } = await supabase
+            .rpc('get_own_observation_locations', { p_observation_ids: [id] });
+          const own = Array.isArray(ownLoc) ? ownLoc[0] as { lat?: number; lng?: number } | undefined : undefined;
+          if (own && Number.isFinite(own.lat) && Number.isFinite(own.lng)) {
+            usePoint = { coordinates: [own.lng as number, own.lat as number] };
+          }
+        } catch { /* fall back to the public point — non-fatal */ }
+        (obs as Record<string, unknown>).location = usePoint;
+      }
       const coords = usePoint?.coordinates;
       if (Array.isArray(coords) && coords.length >= 2) {
         const lng = coords[0];

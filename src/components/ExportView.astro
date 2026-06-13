@@ -132,7 +132,7 @@ const tr = t(lang);
         .from('observations')
         .select(`
           id, observed_at, accuracy_m, obscure_level,
-          state_province, habitat, location,
+          state_province, habitat,
           identifications!inner(scientific_name, confidence, source, is_primary),
           taxa:primary_taxon_id(kingdom)
         `)
@@ -142,14 +142,25 @@ const tr = t(lang);
 
       if (obsErr) throw obsErr;
 
+      // Precise coords for the export come from the owner-only SECURITY
+      // DEFINER RPC — the `location` column itself is no longer
+      // SELECT-granted to clients (2026-06 audit F1).
+      const { data: ownLocs, error: locErr } = await supabase
+        .rpc('get_own_observation_locations');
+      if (locErr) throw locErr;
+      const locById = new Map<string, { lat: number; lng: number }>(
+        ((ownLocs ?? []) as { observation_id: string; lat: number; lng: number }[])
+          .map(l => [l.observation_id, { lat: l.lat, lng: l.lng }]),
+      );
+
       const rows: DwCInput[] = (obs ?? []).map(r => {
-        const loc = (r.location as unknown) as GeoJSON.Point | null;
+        const loc = locById.get(r.id as string) ?? null;
         const id0 = Array.isArray(r.identifications) ? r.identifications[0] : r.identifications;
         return {
           id: r.id as string,
           observed_at: r.observed_at as string,
-          lat: loc?.coordinates?.[1] ?? 0,
-          lng: loc?.coordinates?.[0] ?? 0,
+          lat: loc?.lat ?? 0,
+          lng: loc?.lng ?? 0,
           accuracy_m: r.accuracy_m as number | null,
           obscure_level: (r.obscure_level as string) ?? 'none',
           scientific_name: id0?.scientific_name ?? null,
