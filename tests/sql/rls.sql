@@ -1241,12 +1241,23 @@ DECLARE
   leaked int;
 BEGIN
   -- Seed a 'full' observation with a primary identification for uid_user.
-  INSERT INTO public.observations (id, observer_id, sync_status, obscure_level, hidden)
+  -- Order matters: the identification insert fires sync_primary_id_trigger,
+  -- which recomputes obscure_level from the (here non-existent) taxon and
+  -- COALESCEs to 'none'. We must set obscure_level = 'full' *after* that, via
+  -- an observations UPDATE (which does not re-fire the identification trigger
+  -- — only observations_material_edit_check_trg runs, and it touches only
+  -- last_material_edit_at). Seeding 'full' on the initial INSERT would be
+  -- silently clobbered back to 'none' and the assertion below would falsely
+  -- "leak".
+  INSERT INTO public.observations (id, observer_id, sync_status, hidden)
   VALUES ('aaaaaaaa-0000-0000-0000-000000000004',
-          '00000000-0000-0000-0000-000000000003', 'synced', 'full', false)
+          '00000000-0000-0000-0000-000000000003', 'synced', false)
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO public.identifications (observation_id, scientific_name, confidence, source, is_primary)
   VALUES ('aaaaaaaa-0000-0000-0000-000000000004', 'Occultus totalis', 0.9, 'human', true);
+  UPDATE public.observations
+     SET obscure_level = 'full'
+   WHERE id = 'aaaaaaaa-0000-0000-0000-000000000004';
 
   SELECT count(*)::int INTO leaked
     FROM public.profile_pokedex
