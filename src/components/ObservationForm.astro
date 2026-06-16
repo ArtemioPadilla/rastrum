@@ -34,12 +34,16 @@ const initialSubmitLabel = identifyOnly ? submitIdentifyLabel : submitFullLabel;
 // taxon-hint chip strings (extracted to typed locals for the JSX)
 const taxonHintStrings = (tr.observe as unknown as { taxon_hint?: Record<string, string> }).taxon_hint ?? {};
 const taxonHintLabel = taxonHintStrings.label ?? (isEs ? '¿Qué viste?' : 'What did you see?');
-const taxonHintPlant   = taxonHintStrings.plant   ?? (isEs ? 'Planta'   : 'Plant');
-const taxonHintBird    = taxonHintStrings.bird    ?? (isEs ? 'Ave'      : 'Bird');
-const taxonHintMammal  = taxonHintStrings.mammal  ?? (isEs ? 'Mamífero' : 'Mammal');
-const taxonHintInsect  = taxonHintStrings.insect  ?? (isEs ? 'Insecto'  : 'Insect');
-const taxonHintFungus  = taxonHintStrings.fungus  ?? (isEs ? 'Hongo'    : 'Fungus');
-const taxonHintClear   = taxonHintStrings.clear   ?? (isEs ? 'Quitar pista' : 'Clear hint');
+const taxonHintPlant     = taxonHintStrings.plant     ?? (isEs ? 'Planta'    : 'Plant');
+const taxonHintBird      = taxonHintStrings.bird      ?? (isEs ? 'Ave'       : 'Bird');
+const taxonHintMammal    = taxonHintStrings.mammal    ?? (isEs ? 'Mamífero'  : 'Mammal');
+const taxonHintInsect    = taxonHintStrings.insect    ?? (isEs ? 'Insecto'   : 'Insect');
+const taxonHintFungus    = taxonHintStrings.fungus    ?? (isEs ? 'Hongo'     : 'Fungus');
+const taxonHintReptile   = taxonHintStrings.reptile   ?? (isEs ? 'Reptil'    : 'Reptile');
+const taxonHintAmphibian = taxonHintStrings.amphibian ?? (isEs ? 'Anfibio'   : 'Amphibian');
+const taxonHintFish      = taxonHintStrings.fish      ?? (isEs ? 'Pez'       : 'Fish');
+const taxonHintArachnid  = taxonHintStrings.arachnid  ?? (isEs ? 'Arácnido'  : 'Arachnid');
+const taxonHintClear     = taxonHintStrings.clear     ?? (isEs ? 'Quitar pista' : 'Clear hint');
 const observeStringsForLabels = tr.observe as unknown as Record<string, string>;
 const shareLabel = observeStringsForLabels.share ?? (isEs ? 'Compartir' : 'Share');
 const shareUnavailableHint = observeStringsForLabels.share_unavailable_hint ?? (isEs ? 'Guarda primero la observación para compartirla.' : 'Save the observation first to share.');
@@ -234,7 +238,11 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
           <button type="button" data-hint="Plantae" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🌿</span> {taxonHintPlant}</button>
           <button type="button" data-hint="Animalia.Aves" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐦</span> {taxonHintBird}</button>
           <button type="button" data-hint="Animalia.Mammalia" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐾</span> {taxonHintMammal}</button>
+          <button type="button" data-hint="Animalia.Reptilia" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🦎</span> {taxonHintReptile}</button>
+          <button type="button" data-hint="Animalia.Amphibia" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐸</span> {taxonHintAmphibian}</button>
           <button type="button" data-hint="Animalia.Insecta" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐛</span> {taxonHintInsect}</button>
+          <button type="button" data-hint="Animalia.Arachnida" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🕷️</span> {taxonHintArachnid}</button>
+          <button type="button" data-hint="Animalia.Actinopterygii" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐟</span> {taxonHintFish}</button>
           <button type="button" data-hint="Fungi" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🍄</span> {taxonHintFungus}</button>
           <button type="button" id="taxon-hint-clear" class="hidden min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-transparent text-zinc-600 dark:text-zinc-300 hover:text-zinc-700 dark:hover:text-zinc-200 underline">{taxonHintClear}</button>
         </div>
@@ -1239,7 +1247,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
   // ── Taxon hint chips (ux-quick-taxon-chips) ──────────────────────────
   // Tapping a chip primes the cascade by filtering runners (e.g. 🐦 drops
   // PlantNet, prefers Phi/Claude). Default state = no hint.
-  type TaxonHint = 'Plantae' | 'Animalia.Aves' | 'Animalia.Mammalia' | 'Animalia.Insecta' | 'Fungi';
+  type TaxonHint = 'Plantae' | 'Animalia.Aves' | 'Animalia.Mammalia' | 'Animalia.Insecta' | 'Animalia.Reptilia' | 'Animalia.Amphibia' | 'Animalia.Actinopterygii' | 'Animalia.Arachnida' | 'Fungi';
   let activeTaxonHint: TaxonHint | null = null;
   const taxonChipBtns = document.querySelectorAll<HTMLButtonElement>('.taxon-chip');
   const taxonClearBtn = document.getElementById('taxon-hint-clear');
