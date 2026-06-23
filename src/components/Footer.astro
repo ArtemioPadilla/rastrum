@@ -1,6 +1,7 @@
 ---
 import { t, getLocalizedPath, getDocPath, getAlternateUrl, routes, type Locale } from '../i18n/utils';
 import { resolveChromeMode } from '../lib/chrome-mode';
+import RastrumLogo from './RastrumLogo.astro';
 
 interface Props {
   lang: string;
@@ -59,7 +60,7 @@ const mLinkClass = 'text-zinc-600 dark:text-zinc-400';
       <div class="sm:col-span-2 lg:col-span-2 space-y-3">
         <a href={getLocalizedPath(lang, '/')}
            class="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-lg">
-          <img src="/rastrum-logo.svg" alt="" class="w-6 h-6" width="24" height="24" loading="lazy" />
+          <RastrumLogo class="w-6 h-6" width={24} height={24} />
           Rastrum
         </a>
         <p class="text-sm text-zinc-600 dark:text-zinc-400">{tr.footer.tagline}</p>
@@ -137,7 +138,7 @@ const mLinkClass = 'text-zinc-600 dark:text-zinc-400';
       <div class="space-y-2">
         <a href={getLocalizedPath(lang, '/')}
            class="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-          <img src="/rastrum-logo.svg" alt="" class="w-5 h-5" width="20" height="20" loading="lazy" />
+          <RastrumLogo class="w-5 h-5" width={20} height={20} />
           Rastrum
         </a>
         <p class="text-xs text-zinc-400 dark:text-zinc-300">{tr.footer.tagline}</p>

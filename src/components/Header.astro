@@ -3,6 +3,7 @@ import { t, getLocalizedPath, getAlternateLocale, getAlternateUrl, routes, type 
 import { isActiveSection } from '../lib/chrome-helpers';
 import BellIcon from './BellIcon.astro';
 import MegaMenu from './MegaMenu.astro';
+import RastrumLogo from './RastrumLogo.astro';
 import MobileBottomBar from './MobileBottomBar.astro';
 import MobileDrawer from './MobileDrawer.astro';
 import SyncPill from './SyncPill.astro';
@@ -139,7 +140,7 @@ const docColumns = [
     <!-- Lockup -->
     <a href={getLocalizedPath(lang, '/')} class="flex flex-col leading-tight">
       <span class="flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400">
-        <img src="/rastrum-logo.svg" alt="" class="w-7 h-7" width="28" height="28" />
+        <RastrumLogo class="w-7 h-7" width={28} height={28} />
         Rastrum
       </span>
       <span class="hidden md:block text-[11px] text-zinc-600 dark:text-zinc-400 -mt-0.5 ml-9">
